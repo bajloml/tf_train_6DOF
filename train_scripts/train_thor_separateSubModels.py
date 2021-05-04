@@ -199,11 +199,19 @@ if __name__ == '__main__':
     # save the hyper parameters passed
     #with open (debugFolderPath+'/header.txt', 'w') as file:
     #    file.write(str(opt))
-    with open (os.path.join(debugFolderPath,'header.txt'), 'w') as file:
-        file.write(str(opt)+"\n")
-    with open (os.path.join(debugFolderPath,'test_metric.csv'), 'w') as file:
-        file.write("epoch, passed,total \n")
+    if (os.path.exists(os.path.join(debugFolderPath,'header.txt'))):
+        with open (os.path.join(debugFolderPath,'header.txt'), 'a') as file:
+            file.write(str(opt)+"\n")
+    else:
+        with open (os.path.join(debugFolderPath,'header.txt'), 'w') as file:
+            file.write(str(opt)+"\n")
 
+    if (os.path.exists(os.path.join(debugFolderPath,'test_metric.csv'))):        
+        with open (os.path.join(debugFolderPath,'test_metric.csv'), 'a') as file:
+            file.write("epoch, passed,total \n")
+    else:
+        with open (os.path.join(debugFolderPath,'test_metric.csv'), 'w') as file:
+            file.write("epoch, passed,total \n")
     # print parameters
     print("PARAMETERS:\n")
     parametersList = str(opt).split(',')
@@ -245,7 +253,6 @@ if __name__ == '__main__':
     # /cpu --> for a cpu training
     # /device:GPU:0 --> GPU T4 on GCP
     with tf.device('/GPU:0'):
-
         try:
             print('train dataset number of batches: {}'.format(len(train_dataset)))
             print('test dataset number of batches: {}'.format(len(test_dataset)))
@@ -309,16 +316,27 @@ if __name__ == '__main__':
             #test_summary_writer = tf.summary.create_file_writer(test_log_dir)
 
             #create csv files for the loss values
-            with open(os.path.join(debugFolderPath,'Beliefs_loss.txt'), 'w') as bel_csv:
-                bel_csv.write('Epoch; Beliefs loss;\n')
-            with open(os.path.join(debugFolderPath,'Affinity_loss.txt'), 'w') as aff_csv:
-                aff_csv.write('Epoch; Affinity loss;\n')
-
+            if (os.path.exists(os.path.join(debugFolderPath,'Beliefs_loss.txt')) and os.path.exists(os.path.join(debugFolderPath,'Affinity_loss.txt'))):
+                with open(os.path.join(debugFolderPath,'Beliefs_loss.txt'), 'a') as bel_csv:
+                    bel_csv.write('Epoch; Beliefs loss;\n')
+                with open(os.path.join(debugFolderPath,'Affinity_loss.txt'), 'a') as aff_csv:
+                    aff_csv.write('Epoch; Affinity loss;\n')
+            else:
+                with open(os.path.join(debugFolderPath,'Beliefs_loss.txt'), 'w') as bel_csv:
+                    bel_csv.write('Epoch; Beliefs loss;\n')
+                with open(os.path.join(debugFolderPath,'Affinity_loss.txt'), 'w') as aff_csv:
+                    aff_csv.write('Epoch; Affinity loss;\n')
             #log important outputs to log file
-            with open(os.path.join(debugFolderPath, 'logfile.txt'), 'w') as logfile:
-                logfile.write("start training: " + str(datetime.datetime.now().date()) + " " + str(datetime.datetime.now().time()) + "\n")
-                logfile.write("--------------------------------------------------------------------------------------------------------\n")
-                logfile.write("--------------------------------------------------------------------------------------------------------\n")
+            if (os.path.exists(os.path.join(debugFolderPath,'Beliefs_loss.txt'))):
+                with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
+                    logfile.write("start training: " + str(datetime.datetime.now().date()) + " " + str(datetime.datetime.now().time()) + "\n")
+                    logfile.write("--------------------------------------------------------------------------------------------------------\n")
+                    logfile.write("--------------------------------------------------------------------------------------------------------\n")
+            else:
+                with open(os.path.join(debugFolderPath, 'logfile.txt'), 'w') as logfile:
+                    logfile.write("start training: " + str(datetime.datetime.now().date()) + " " + str(datetime.datetime.now().time()) + "\n")
+                    logfile.write("--------------------------------------------------------------------------------------------------------\n")
+                    logfile.write("--------------------------------------------------------------------------------------------------------\n")
 
             # check dataset
             batch_check = train_dataset[0]
@@ -330,11 +348,10 @@ if __name__ == '__main__':
             tf.print('batch_check[0][beliefs] max-> {}, min-> {}'.format(tf.reduce_max(batch_check[1]['beliefs']), tf.reduce_min(batch_check[1]['beliefs'])))
             tf.print('batch_check[0][affinities] max-> {}, min-> {}'.format(tf.reduce_max(batch_check[1]['affinities']), tf.reduce_min(batch_check[1]['affinities'])))
 
-
             for epoch in epochRange:
                 tf.print("\nStart of epoch {}".format(epoch))
                 epoch_count = epoch
-
+                epoch_start_time = datetime.datetime.now().time().strftime('%H:%M:%S')
                 #log important outputs to log file
                 with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
                     logfile.write("Start of epoch {}".format(epoch) + "\n")
@@ -454,6 +471,14 @@ if __name__ == '__main__':
                     # save a checkpoints after each epoch to be able to load weights
                     tf.print('Saving the checkpoints: {}'.format(ckptPathToSave))
                     netModel.save_weights(os.path.join(ckptPathToSave, 'cp.ckpt'))
+
+                    #calculate epoch time
+                    epoch_end_time = datetime.datetime.now().time().strftime('%H:%M:%S')
+                    epoch_duration = (datetime.datetime.strptime(epoch_end_time,'%H:%M:%S') - datetime.datetime.strptime(epoch_start_time,'%H:%M:%S'))
+                    tf.print('Epoch duration(h:mm:ss): {}'.format(epoch_duration))
+                    #log important outputs to log file
+                    with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
+                        logfile.write('Epoch duration: {}'.format(epoch_duration) + "\n")
 
             tf.print("Training finished after {} epochs.".format(epoch_count))
             #log important outputs to log file

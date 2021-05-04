@@ -10,9 +10,9 @@ the code is written using the Tensorflow and trained on GCP.
     }
 
 
-Dataset is created using the NDDS and UE4 engine on the model created in Blender.
+#Dataset is created using the NDDS and UE4 engine on the model created in Blender.
 
-Dataset_Synthesizer
+#Dataset_Synthesizer
 @misc{to2018ndds,
     author = {Thang To and Jonathan Tremblay and Duncan McKay and Yukie Yamaguchi and Kirby Leung 
             and Adrian Balanon and Jia Cheng and William Hodge and Stan Birchfield},
@@ -20,3 +20,7 @@ Dataset_Synthesizer
     title = {{NDDS}: {NVIDIA} Deep Learning Dataset Synthesizer},
     Year = 2018
     }
+	
+#commit 1
+added calculation for epoch duration
+if files exist in DEBUG folder, content will be append otherwise files will be created
