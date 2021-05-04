@@ -10,9 +10,9 @@ the code is written using the Tensorflow and trained on GCP.
     }
 
 
-#Dataset is created using the NDDS and UE4 engine on the model created in Blender.
+##Dataset is created using the NDDS and UE4 engine on the model created in Blender.
 
-#Dataset_Synthesizer
+##Dataset_Synthesizer
 @misc{to2018ndds,
     author = {Thang To and Jonathan Tremblay and Duncan McKay and Yukie Yamaguchi and Kirby Leung 
             and Adrian Balanon and Jia Cheng and William Hodge and Stan Birchfield},
