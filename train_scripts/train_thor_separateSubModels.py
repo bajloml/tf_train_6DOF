@@ -396,7 +396,7 @@ if __name__ == '__main__':
                     # apply gradients through backpropagation
                     optimizer.apply_gradients(zip(grads, netModel.trainable_variables))
 
-                    debug = ((epoch+1)%10==0)
+                    debug = ((epoch+1)%5==0)
 
                     if debug:
 
