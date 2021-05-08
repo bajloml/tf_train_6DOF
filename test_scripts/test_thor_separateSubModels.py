@@ -75,6 +75,7 @@ if __name__ == '__main__':
     parser.add_argument('--outf', default='tmp', help='folder to output images and model checkpoints, it will add a train_ in front of the name')
     parser.add_argument('--namefile', default='epoch', help="name to put on the file of the save weights")
     parser.add_argument('--sigma', default=4, help='keypoint creation size for sigma')
+    parser.add_argument('--savedmodelpath', help='path to the saved model')
 
     # Read the config but do not overwrite the args written 
     # read the configuration from the file given by with a "-c" or "--config" file if it exists
@@ -107,7 +108,7 @@ if __name__ == '__main__':
                  'imgSize': int(opt.imagesize)}
     #########################################Create debug folder to store the debug data##################################################
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    debugFolderPath = os.path.join(dir_path, 'DEBUG', str(opt.outf))
+    debugFolderPath = os.path.join(dir_path, 'test_DEBUG', str(opt.outf))
 
     # if debug folder doesn't exists, create it
     if not os.path.isdir(debugFolderPath):
@@ -120,12 +121,12 @@ if __name__ == '__main__':
         test_dataset = datasetPreparation(root=opt.datatest, objectsofinterest=opt.obj, datasetName='test_Dataset',
                                           batch_size=opt.batchsize, keep_orientation=True, noise=opt.noise,
                                           sigma=opt.sigma, debugFolderPath=debugFolderPath,
-                                          transform=transform, shuffle=True, saveAffAndBelImages=True)
+                                          transform=transform, shuffle=True, saveAffAndBelImages=False)
     # save the epoch loss, used later to print the loss in a matplotlib
     beliefLoss_perBatch = []
     affinityLoss_perBatch = []
     
-    with tf.device('/CPU:0'):
+    with tf.device('/GPU:0'):
 
         try:
             tf.print ("START: {}".format(datetime.datetime.now().time()))
@@ -133,16 +134,18 @@ if __name__ == '__main__':
 
             tf.keras.backend.clear_session()
 
-            netModel = customModel(pretrained=True, blocks=6, freezeLayers=14,)
+            # netModel = customModel(pretrained=True, blocks=6, freezeLayers=14,)
+            tf.print('Loading the model from path:\n{}'.format(opt.savedmodelpath))
+            netModel = tf.keras.models.load_model(opt.savedmodelpath)
 
             # model can be built by calling the build function but then all of the layers have to be used.
             # or by calling the fit function
             # to load weights model has to be built
-            tf.print('building model: {}'.format(netModel.name))
-            netModel.build(input_shape=(None, 400, 400, 3))
+            # tf.print('building model: {}'.format(netModel.name))
+            # netModel.build(input_shape=(None, 400, 400, 3))
 
-            tf.print('loading weights from: {}'.format(opt.ckptpath))
-            netModel.load_weights(filepath=opt.ckptpath)
+            #tf.print('loading weights from: {}'.format(opt.ckptpath))
+            #netModel.load_weights(filepath=opt.ckptpath)
             # netModel = tf.keras.models.load_model(filepath=opt.net)
 
             # Instantiate losses and metrics.
@@ -204,7 +207,7 @@ if __name__ == '__main__':
                     im=elem
                     new_img.paste(im, (place*width,0))
 
-                new_img.save('test_{}.jpg'.format(step))
+                new_img.save(os.path.join(debugFolderPath, 'test_{}.jpg'.format(step)))
                 #new_img.show()
 
             #Beliefs loss
