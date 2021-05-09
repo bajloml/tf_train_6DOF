@@ -190,10 +190,11 @@ class datasetPreparation(tf.keras.utils.Sequence):
                             cuboid = np.array(info['cuboid_dimensions'])
 
                 # Debug show the image
+                # img_PIL.show()
                 # cv_img_original = np.array(img_PIL)
                 # cv_img_original = cv2.resize(cv_img_original, dsize=(800, 800))
                 # cv2.imshow('cv_img_copy_{}_original'.format(fileName), cv_img_original)
-                # cv2.waitKey(1)
+                # cv2.waitKey(0)
 
                 def Reproject(points, tm, rm):
                     """
@@ -214,7 +215,7 @@ class datasetPreparation(tf.keras.utils.Sequence):
                     return new_cuboid
 
                 # Random image manipulation/augmentation, rotation and translation with zero padding
-                ''' 
+                '''  '''
                 dx = round(np.random.normal(0, 2) * float(self.random_translation[0]))
                 dy = round(np.random.normal(0, 2) * float(self.random_translation[1]))
                 angle = round(np.random.normal(0, 1) * float(self.random_rotation))
@@ -237,7 +238,7 @@ class datasetPreparation(tf.keras.utils.Sequence):
 
                 image_r = cv2.warpAffine(np.array(img_PIL), rm, img_PIL.size)
                 result = cv2.warpAffine(image_r, tm, img_PIL.size)
-                img_PIL = Image.fromarray(result)                   '''
+                img_PIL = Image.fromarray(result)
 
                 # Resize the image or the tensors to be (9, 50, 50)
                 # assumes image width and height are equals values and creates resizeTo tuple(50, 50)
@@ -256,10 +257,10 @@ class datasetPreparation(tf.keras.utils.Sequence):
                 # create a tensor from the numpy array of PIL images
                 nbpoints = 9
                 tensorBeliefs = self.CreateBeliefMap(img=img_PIL,
-                                                      pointsBelief=pointsBelief,
-                                                      nbpoints=nbpoints,
-                                                      sizeFactor=resizeTo,
-                                                      sigma=self.sigma)
+                                                     pointsBelief=pointsBelief,
+                                                     nbpoints=nbpoints,
+                                                     sizeFactor=resizeTo,
+                                                     sigma=self.sigma)
 
                 # Create affinity maps tensor and the PIL image of the vector
                 tensorAffinities, img_PIL_vector = self.CreateAffinityMap(img=img_PIL,
@@ -477,8 +478,10 @@ class datasetPreparation(tf.keras.utils.Sequence):
         # make a grid of images(rows) vertical concat of the numpy array
         # change the type of the rows_cv and add a color to match the type and the shape of the 'img' to be able to concatonate
         gridBeliefImage_cv = cv2.cvtColor(cv2.vconcat(rows_cv.astype(np.uint8)), cv2.COLOR_BGR2RGB)
+        img_res = cv2.resize(np.array(img), dsize=(gridBeliefImage_cv.shape[0], gridBeliefImage_cv.shape[1]))
+        img_res = cv2.cvtColor(img_res, cv2.COLOR_BGR2RGB)
         # attach result image on the grid horizontaly
-        gridBelief_cv = cv2.hconcat([gridBeliefImage_cv, cv2.resize(np.array(img), dsize=(gridBeliefImage_cv.shape[0], gridBeliefImage_cv.shape[1]))])
+        gridBelief_cv = cv2.hconcat([gridBeliefImage_cv, img_res])
         # cv2.imshow('cv_grid_belief2', gridBelief_cv)
         # cv2.waitKey(0)
         cv2.imwrite('{}'.format(pathToSave), gridBelief_cv)
@@ -531,11 +534,13 @@ class datasetPreparation(tf.keras.utils.Sequence):
         gridImage_cv = cv2.cvtColor(gridImage_cv, cv2.COLOR_BGR2RGB)
         # cv2.imshow('gridImage_cv', gridImage_cv)
         # cv2.waitKey(0)
+        img_res = cv2.resize(np.array(img), dsize=(gridImage_cv.shape[0], gridImage_cv.shape[1]))
+        img_res = cv2.cvtColor(img_res, cv2.COLOR_BGR2RGB)
 
         # attach result image on the grid horizontaly
         grid_cv = cv2.hconcat([gridImage_cv,
                                cv2.resize(np.array(img_vector), dsize=(gridImage_cv.shape[0], gridImage_cv.shape[1])),
-                               cv2.resize(np.array(img), dsize=(gridImage_cv.shape[0], gridImage_cv.shape[1]))])
+                               img_res ])
         # cv2.imshow('cv_grid_affinity', grid_cv)
         # cv2.waitKey(0)
         cv2.imwrite('{}'.format(pathToSave), grid_cv)
