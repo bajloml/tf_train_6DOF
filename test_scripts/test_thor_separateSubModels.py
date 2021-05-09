@@ -23,6 +23,32 @@ from datasetPreparation import datasetPreparation
 
 #warnings.filterwarnings("ignore")
 
+def saveLabelLogits(img1, img2, img3, img4, filename):
+
+    fig = plt.figure(figsize=(10, 5))
+    rows = 1
+    columns = 4
+
+    fig.add_subplot(rows, columns, (1))
+    plt.axis('off')
+    plt.imshow(img1)
+    plt.title("beliefs logits")
+
+    fig.add_subplot(rows, columns, (2))
+    plt.axis('off')
+    plt.imshow(img2)
+    plt.title("beliefs label")
+
+    fig.add_subplot(rows, columns, (3))
+    plt.axis('off')
+    plt.imshow(img3)
+    plt.title("affinity logits")
+
+    fig.add_subplot(rows, columns, (4))
+    plt.axis('off')
+    plt.imshow(img4)
+    plt.title("affinity label")
+    plt.savefig(filename+'.png')
 
 def getLabelsLogitsImages(logits_bel, logits_aff, batch_tr, img_number):
 
@@ -195,7 +221,8 @@ if __name__ == '__main__':
                 ################################################# print outputs #################################################
                 # show labels and logits of the first image of the dataset
                 imgBelLog, imgBelLab, imgAffLog, imgAffLab = getLabelsLogitsImages(logits_beliefs, logits_affinities, batch_test, 0)
-
+                saveLabelLogits(imgBelLog, imgBelLab, imgAffLog, imgAffLab, os.path.join(debugFolderPath, 'test_{}'.format(step)))
+                """
                 list_im = [imgBelLog, imgBelLab, imgAffLog, imgAffLab]
                 width = imgBelLog.width
                 height = imgBelLog.height
@@ -209,7 +236,7 @@ if __name__ == '__main__':
 
                 new_img.save(os.path.join(debugFolderPath, 'test_{}.jpg'.format(step)))
                 #new_img.show()
-
+                """
             #Beliefs loss
             tf.print("SAVING BELIEFS AND AFFINITIES LOSS PLOTS...")
             plt.figure(figsize=(20,10))
