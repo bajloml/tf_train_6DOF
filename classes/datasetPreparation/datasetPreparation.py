@@ -310,7 +310,10 @@ class datasetPreparation(tf.keras.utils.Sequence):
                 affinities_list.append(tensorAffinities)
 
             else:
-              tf.print('{} is missing json or png'.format(fileName.split('.')[0]))
+                tf.print('{} is missing json or png'.format(fileName.split('.')[0]))
+                imgs_list.append(tf.zeros((self.img_size, self.img_size, 3), dtype=tf.float32))
+                beliefs_list.append(tf.zeros((50, 50, 9), dtype=tf.float32))
+                affinities_list.append(tf.zeros((50, 50, 16), dtype=tf.float32))
 
         batch_imgs = tf.keras.backend.stack(imgs_list)
         batch_beliefs = tf.keras.backend.stack(beliefs_list)
