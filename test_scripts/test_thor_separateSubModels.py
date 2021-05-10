@@ -23,6 +23,32 @@ from datasetPreparation import datasetPreparation
 
 #warnings.filterwarnings("ignore")
 
+def saveLabelLogits(img1, img2, img3, img4, filename):
+
+    fig = plt.figure(figsize=(10, 5))
+    rows = 1
+    columns = 4
+
+    fig.add_subplot(rows, columns, (1))
+    plt.axis('off')
+    plt.imshow(img1)
+    plt.title("beliefs logits")
+
+    fig.add_subplot(rows, columns, (2))
+    plt.axis('off')
+    plt.imshow(img2)
+    plt.title("beliefs label")
+
+    fig.add_subplot(rows, columns, (3))
+    plt.axis('off')
+    plt.imshow(img3)
+    plt.title("affinity logits")
+
+    fig.add_subplot(rows, columns, (4))
+    plt.axis('off')
+    plt.imshow(img4)
+    plt.title("affinity label")
+    plt.savefig(filename+'.png')
 
 def getLabelsLogitsImages(logits_bel, logits_aff, batch_tr, img_number):
 
@@ -120,12 +146,12 @@ if __name__ == '__main__':
         test_dataset = datasetPreparation(root=opt.datatest, objectsofinterest=opt.obj, datasetName='test_Dataset',
                                           batch_size=opt.batchsize, keep_orientation=True, noise=opt.noise,
                                           sigma=opt.sigma, debugFolderPath=debugFolderPath,
-                                          transform=transform, shuffle=True, saveAffAndBelImages=True)
+                                          transform=transform, shuffle=True, saveAffAndBelImages=False)
     # save the epoch loss, used later to print the loss in a matplotlib
     beliefLoss_perBatch = []
     affinityLoss_perBatch = []
     
-    with tf.device('/CPU:0'):
+    with tf.device('/GPU:0'):
 
         try:
             tf.print ("START: {}".format(datetime.datetime.now().time()))
@@ -192,6 +218,8 @@ if __name__ == '__main__':
                 ################################################# print outputs #################################################
                 # show labels and logits of the first image of the dataset
                 imgBelLog, imgBelLab, imgAffLog, imgAffLab = getLabelsLogitsImages(logits_beliefs, logits_affinities, batch_test, 0)
+                # show labels and logits of the first image of the dataset
+                saveLabelLogits(imgBelLog, imgBelLab, imgAffLog, imgAffLab, os.path.join(debugFolderPath, 'test_{}'.format(step)))
 
                 list_im = [imgBelLog, imgBelLab, imgAffLog, imgAffLab]
                 width = imgBelLog.width
@@ -204,7 +232,7 @@ if __name__ == '__main__':
                     im=elem
                     new_img.paste(im, (place*width,0))
 
-                new_img.save('test_{}.jpg'.format(step))
+                #new_img.save('test_{}.jpg'.format(step))
                 #new_img.show()
 
             #Beliefs loss
