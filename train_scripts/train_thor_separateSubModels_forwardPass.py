@@ -147,9 +147,9 @@ def forwardPass(model, dataset, optimizer, loss_fn_belief, loss_fn_affinity, bel
             # pbar is not used, because of the nohup
             tf.print('train: {}/{}, mse beliefs: {}, mse_affinity: {}'.format(step+1, len(dataset), loss_beliefs_value, loss_affinities_value))
             # Use the gradient tape to automatically retrieve the gradients of the trainable variables with respect to the loss.
-            grads = tape.gradient(loss, netModel.trainable_variables)
+            grads = tape.gradient(loss, model.trainable_variables)
             # apply gradients through backpropagation
-            optimizer.apply_gradients(zip(grads, netModel.trainable_variables))
+            optimizer.apply_gradients(zip(grads, model.trainable_variables))
         else:
             # pbar is not used, because of the nohup
             tf.print('test: {}/{}, mse beliefs: {}, mse_affinity: {}'.format(step+1, len(dataset), loss_beliefs_value, loss_affinities_value))
