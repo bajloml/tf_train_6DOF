@@ -291,9 +291,6 @@ class datasetPreparation(tf.keras.utils.Sequence):
                 # to numpy array
                 img_np = tf.keras.preprocessing.image.img_to_array(img_PIL)
 
-                # apply the normalization on the image array
-                # img_np *= (1.0/img_np.max())
-
                 # to tensorflow tensor
                 tensorImg = tf.keras.backend.constant(img_np)
 
@@ -303,12 +300,12 @@ class datasetPreparation(tf.keras.utils.Sequence):
 
                 # normalize beliefs to be 0-1
                 tensorBeliefs = tf.math.divide(tf.subtract(tensorBeliefs, tf.reduce_min(tensorBeliefs)),
-                                               tf.subtract(tf.reduce_max(tensorBeliefs), tf.reduce_min(tensorBeliefs)))
+                                               tf.subtract(tf.reduce_max(tensorBeliefs), tf.reduce_min(tensorBeliefs))) * 255
 
                 # normalize affinities to be 0-1
                 tensorAffinities = tf.abs(tensorAffinities)
                 tensorAffinities = tf.math.divide(tf.subtract(tensorAffinities, tf.reduce_min(tensorAffinities)),
-                                                  tf.subtract(tf.reduce_max(tensorAffinities), tf.reduce_min(tensorAffinities)))
+                                                  tf.subtract(tf.reduce_max(tensorAffinities), tf.reduce_min(tensorAffinities))) * 255
 
                 # append to the list of tensors
                 imgs_list.append(tensorImg)

@@ -65,22 +65,22 @@ to use this script on the PC with multiple versions of the python, either use th
 def getLabelsLogitsImages(logits_bel, logits_aff, batch, img_number):
 
     # belief logits
-    beliefLogitsTensor = tf.reduce_sum(logits_bel[img_number], axis=2) * 255
+    beliefLogitsTensor = tf.reduce_sum(logits_bel[img_number], axis=2)  # * 255
     beliefLogitsNumpy = beliefLogitsTensor.numpy().astype(np.uint8)
     belLog_img = Image.fromarray(beliefLogitsNumpy)
 
     # belief label
-    beliefLabelTensor = tf.reduce_sum(batch[1]['beliefs'][img_number], axis=2) * 255
+    beliefLabelTensor = tf.reduce_sum(batch[1]['beliefs'][img_number], axis=2)  # * 255
     beliefLabelNumpy = beliefLabelTensor.numpy().astype(np.uint8)
     belLab_img = Image.fromarray(beliefLabelNumpy)
 
     # affinity logits
-    affinityLogitsTensor = tf.reduce_sum(logits_aff[img_number], axis=2) * 255
+    affinityLogitsTensor = tf.reduce_sum(logits_aff[img_number], axis=2)  # * 255
     affinityLogitsNumpy = affinityLogitsTensor.numpy().astype(np.uint8)
     affLog_img = Image.fromarray(affinityLogitsNumpy)
 
     # affinity label
-    affinityLabelTensor = tf.reduce_sum(batch[1]['affinities'][img_number], axis=2) * 255
+    affinityLabelTensor = tf.reduce_sum(batch[1]['affinities'][img_number], axis=2)  # * 255
     affinityLabelNumpy = affinityLabelTensor.numpy().astype(np.uint8)
     affLab_img = Image.fromarray(affinityLabelNumpy)
 
