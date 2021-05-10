@@ -215,7 +215,7 @@ class datasetPreparation(tf.keras.utils.Sequence):
                     return new_cuboid
 
                 # Random image manipulation/augmentation, rotation and translation with zero padding
-                '''  '''
+                '''     
                 dx = round(np.random.normal(0, 2) * float(self.random_translation[0]))
                 dy = round(np.random.normal(0, 2) * float(self.random_translation[1]))
                 angle = round(np.random.normal(0, 1) * float(self.random_rotation))
@@ -238,7 +238,7 @@ class datasetPreparation(tf.keras.utils.Sequence):
 
                 image_r = cv2.warpAffine(np.array(img_PIL), rm, img_PIL.size)
                 result = cv2.warpAffine(image_r, tm, img_PIL.size)
-                img_PIL = Image.fromarray(result)
+                img_PIL = Image.fromarray(result)       '''
 
                 # Resize the image or the tensors to be (9, 50, 50)
                 # assumes image width and height are equals values and creates resizeTo tuple(50, 50)
@@ -281,10 +281,10 @@ class datasetPreparation(tf.keras.utils.Sequence):
                 # image augmentation
                 # apply random contrast, random brightness and resize
                 # apply the normal probability density function, around the loc=1 for a value scale(gauss around loc for a scale limit)
-                # enhancer = ImageEnhance.Contrast(img_PIL)
-                # img_PIL = enhancer.enhance(np.random.normal(loc=1, scale=self.transform["contrast"]))
-                # enhancer = ImageEnhance.Brightness(img_PIL)
-                # img_PIL = enhancer.enhance(np.random.normal(loc=1, scale=self.transform["brightness"]))
+                enhancer = ImageEnhance.Contrast(img_PIL)
+                img_PIL = enhancer.enhance(np.random.normal(loc=1, scale=self.transform["contrast"]))
+                enhancer = ImageEnhance.Brightness(img_PIL)
+                img_PIL = enhancer.enhance(np.random.normal(loc=1, scale=self.transform["brightness"]))
                 # img_PIL = img_PIL.resize((self.transform["imgSize"], self.transform["imgSize"]))
 
                 # transform PIL image to tensor over the numpy array
@@ -301,9 +301,14 @@ class datasetPreparation(tf.keras.utils.Sequence):
                 tensorBeliefs = tf.transpose(tensorBeliefs, [1, 2, 0])
                 tensorAffinities = tf.transpose(tensorAffinities, [1, 2, 0])
 
-                tensorAffinities = tf.abs(tensorAffinities) 
+                # normalize beliefs to be 0-1
+                tensorBeliefs = tf.math.divide(tf.subtract(tensorBeliefs, tf.reduce_min(tensorBeliefs)),
+                                               tf.subtract(tf.reduce_max(tensorBeliefs), tf.reduce_min(tensorBeliefs)))
+
+                # normalize affinities to be 0-1
+                tensorAffinities = tf.abs(tensorAffinities)
                 tensorAffinities = tf.math.divide(tf.subtract(tensorAffinities, tf.reduce_min(tensorAffinities)),
-                                                    tf.subtract(tf.reduce_max(tensorAffinities), tf.reduce_min(tensorAffinities))) *255
+                                                  tf.subtract(tf.reduce_max(tensorAffinities), tf.reduce_min(tensorAffinities)))
 
                 # append to the list of tensors
                 imgs_list.append(tensorImg)
@@ -540,7 +545,7 @@ class datasetPreparation(tf.keras.utils.Sequence):
         # attach result image on the grid horizontaly
         grid_cv = cv2.hconcat([gridImage_cv,
                                cv2.resize(np.array(img_vector), dsize=(gridImage_cv.shape[0], gridImage_cv.shape[1])),
-                               img_res ])
+                               img_res])
         # cv2.imshow('cv_grid_affinity', grid_cv)
         # cv2.waitKey(0)
         cv2.imwrite('{}'.format(pathToSave), grid_cv)

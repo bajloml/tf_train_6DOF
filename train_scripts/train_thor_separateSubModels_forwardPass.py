@@ -9,6 +9,7 @@ import configparser
 import datetime
 import warnings
 from PIL import Image
+import numpy as np
 
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -65,22 +66,22 @@ def getLabelsLogitsImages(logits_bel, logits_aff, batch, img_number):
 
     # belief logits
     beliefLogitsTensor = tf.reduce_sum(logits_bel[img_number], axis=2) * 255
-    beliefLogitsNumpy = beliefLogitsTensor.numpy()
+    beliefLogitsNumpy = beliefLogitsTensor.numpy().astype(np.uint8)
     belLog_img = Image.fromarray(beliefLogitsNumpy)
 
     # belief label
     beliefLabelTensor = tf.reduce_sum(batch[1]['beliefs'][img_number], axis=2) * 255
-    beliefLabelNumpy = beliefLabelTensor.numpy()
+    beliefLabelNumpy = beliefLabelTensor.numpy().astype(np.uint8)
     belLab_img = Image.fromarray(beliefLabelNumpy)
 
     # affinity logits
-    affinityLogitsTensor = tf.reduce_sum(logits_aff[img_number], axis=2)
-    affinityLogitsNumpy = affinityLogitsTensor.numpy()
+    affinityLogitsTensor = tf.reduce_sum(logits_aff[img_number], axis=2) * 255
+    affinityLogitsNumpy = affinityLogitsTensor.numpy().astype(np.uint8)
     affLog_img = Image.fromarray(affinityLogitsNumpy)
 
     # affinity label
-    affinityLabelTensor = tf.reduce_sum(batch[1]['affinities'][img_number], axis=2)
-    affinityLabelNumpy = affinityLabelTensor.numpy()
+    affinityLabelTensor = tf.reduce_sum(batch[1]['affinities'][img_number], axis=2) * 255
+    affinityLabelNumpy = affinityLabelTensor.numpy().astype(np.uint8)
     affLab_img = Image.fromarray(affinityLabelNumpy)
 
     return belLog_img, belLab_img, affLog_img, affLab_img
@@ -152,20 +153,17 @@ def forwardPass(model, dataset, optimizer, loss_fn_belief, loss_fn_affinity, bel
         else:
             # pbar is not used, because of the nohup
             tf.print('test: {}/{}, mse beliefs: {}, mse_affinity: {}'.format(step+1, len(dataset), loss_beliefs_value, loss_affinities_value))
-    
+
     del(tape)
 
     # at the end save some labels and logits
+    # show labels and logits of the first image of the batch
+    belLog_img, belLab_img, affLog_img, affLab_img = getLabelsLogitsImages(logits_beliefs, logits_affinities, batch, 0)
+
     if training:
-        debug = ((epoch+1) % 3 == 0)
-        if debug:
-            # get label, logits images
-            belLog_img, belLab_img, affLog_img, affLab_img = getLabelsLogitsImages(logits_beliefs, logits_affinities, batch, 0)
-            # save images
-            saveLabelLogits(belLog_img, belLab_img, affLog_img, affLab_img, os.path.join(pathToSave, 'train_{}_epoch.png'.format(epoch)))
+        # save images
+        saveLabelLogits(belLog_img, belLab_img, affLog_img, affLab_img, os.path.join(pathToSave, 'train_{}_epoch.png'.format(epoch)))
     else:
-        # show labels and logits of the first image of the batch
-        belLog_img, belLab_img, affLog_img, affLab_img = getLabelsLogitsImages(logits_beliefs, logits_affinities, batch, 0)
         # save images
         saveLabelLogits(belLog_img, belLab_img, affLog_img, affLab_img, os.path.join(pathToSave, 'test_{}_epoch.png'.format(epoch)))
 
@@ -485,9 +483,9 @@ if __name__ == '__main__':
                 #     logfile.write("--------------------------------------------------------------------------------------------------------\n")
                 # fill list of beliefs and affinity losses
                 with open(os.path.join(debugFolderPath, 'Beliefs_loss.txt'), 'a') as bel_csv:
-                    bel_csv.write('{}; {};\n'.format(epoch, repr(round(float(beliefs_metric.result().numpy()), 4))))
+                    bel_csv.write('{}; {};\n'.format(epoch, repr(round(float(beliefs_metric.result().numpy()), 20))))
                 with open(os.path.join(debugFolderPath, 'Affinity_loss.txt'), 'a') as aff_csv:
-                    aff_csv.write('{}; {};\n'.format(epoch, repr(round(float(affinities_metric.result().numpy()), 4))))
+                    aff_csv.write('{}; {};\n'.format(epoch, repr(round(float(affinities_metric.result().numpy()), 20))))
 
                 # reset metrics per batch
                 beliefs_metric.reset_states()
