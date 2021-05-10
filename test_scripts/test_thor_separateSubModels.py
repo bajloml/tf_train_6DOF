@@ -101,6 +101,7 @@ if __name__ == '__main__':
     parser.add_argument('--outf', default='tmp', help='folder to output images and model checkpoints, it will add a train_ in front of the name')
     parser.add_argument('--namefile', default='epoch', help="name to put on the file of the save weights")
     parser.add_argument('--sigma', default=4, help='keypoint creation size for sigma')
+    parser.add_argument('--savedmodelpath', help='path to the saved model')
 
     # Read the config but do not overwrite the args written 
     # read the configuration from the file given by with a "-c" or "--config" file if it exists
@@ -133,7 +134,7 @@ if __name__ == '__main__':
                  'imgSize': int(opt.imagesize)}
     #########################################Create debug folder to store the debug data##################################################
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    debugFolderPath = os.path.join(dir_path, 'DEBUG', str(opt.outf))
+    debugFolderPath = os.path.join(dir_path, 'test_DEBUG', str(opt.outf))
 
     # if debug folder doesn't exists, create it
     if not os.path.isdir(debugFolderPath):
@@ -159,16 +160,18 @@ if __name__ == '__main__':
 
             tf.keras.backend.clear_session()
 
-            netModel = customModel(pretrained=True, blocks=6, freezeLayers=14,)
+            # netModel = customModel(pretrained=True, blocks=6, freezeLayers=14,)
+            tf.print('Loading the model from path:\n{}'.format(opt.savedmodelpath))
+            netModel = tf.keras.models.load_model(opt.savedmodelpath)
 
             # model can be built by calling the build function but then all of the layers have to be used.
             # or by calling the fit function
             # to load weights model has to be built
-            tf.print('building model: {}'.format(netModel.name))
-            netModel.build(input_shape=(None, 400, 400, 3))
+            # tf.print('building model: {}'.format(netModel.name))
+            # netModel.build(input_shape=(None, 400, 400, 3))
 
-            tf.print('loading weights from: {}'.format(opt.ckptpath))
-            netModel.load_weights(filepath=opt.ckptpath)
+            #tf.print('loading weights from: {}'.format(opt.ckptpath))
+            #netModel.load_weights(filepath=opt.ckptpath)
             # netModel = tf.keras.models.load_model(filepath=opt.net)
 
             # Instantiate losses and metrics.
@@ -218,9 +221,14 @@ if __name__ == '__main__':
                 ################################################# print outputs #################################################
                 # show labels and logits of the first image of the dataset
                 imgBelLog, imgBelLab, imgAffLog, imgAffLab = getLabelsLogitsImages(logits_beliefs, logits_affinities, batch_test, 0)
+<<<<<<< HEAD
                 # show labels and logits of the first image of the dataset
                 saveLabelLogits(imgBelLog, imgBelLab, imgAffLog, imgAffLab, os.path.join(debugFolderPath, 'test_{}'.format(step)))
 
+=======
+                saveLabelLogits(imgBelLog, imgBelLab, imgAffLog, imgAffLab, os.path.join(debugFolderPath, 'test_{}'.format(step)))
+                """
+>>>>>>> cb30ae344292312d90eb8cc7e6ad21dbf96b75ab
                 list_im = [imgBelLog, imgBelLab, imgAffLog, imgAffLab]
                 width = imgBelLog.width
                 height = imgBelLog.height
@@ -232,9 +240,13 @@ if __name__ == '__main__':
                     im=elem
                     new_img.paste(im, (place*width,0))
 
+<<<<<<< HEAD
                 #new_img.save('test_{}.jpg'.format(step))
+=======
+                new_img.save(os.path.join(debugFolderPath, 'test_{}.jpg'.format(step)))
+>>>>>>> cb30ae344292312d90eb8cc7e6ad21dbf96b75ab
                 #new_img.show()
-
+                """
             #Beliefs loss
             tf.print("SAVING BELIEFS AND AFFINITIES LOSS PLOTS...")
             plt.figure(figsize=(20,10))

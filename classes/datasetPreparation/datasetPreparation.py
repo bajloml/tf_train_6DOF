@@ -190,10 +190,11 @@ class datasetPreparation(tf.keras.utils.Sequence):
                             cuboid = np.array(info['cuboid_dimensions'])
 
                 # Debug show the image
+                # img_PIL.show()
                 # cv_img_original = np.array(img_PIL)
                 # cv_img_original = cv2.resize(cv_img_original, dsize=(800, 800))
                 # cv2.imshow('cv_img_copy_{}_original'.format(fileName), cv_img_original)
-                # cv2.waitKey(1)
+                # cv2.waitKey(0)
 
                 def Reproject(points, tm, rm):
                     """
@@ -214,7 +215,7 @@ class datasetPreparation(tf.keras.utils.Sequence):
                     return new_cuboid
 
                 # Random image manipulation/augmentation, rotation and translation with zero padding
-                ''' 
+                '''     
                 dx = round(np.random.normal(0, 2) * float(self.random_translation[0]))
                 dy = round(np.random.normal(0, 2) * float(self.random_translation[1]))
                 angle = round(np.random.normal(0, 1) * float(self.random_rotation))
@@ -237,7 +238,7 @@ class datasetPreparation(tf.keras.utils.Sequence):
 
                 image_r = cv2.warpAffine(np.array(img_PIL), rm, img_PIL.size)
                 result = cv2.warpAffine(image_r, tm, img_PIL.size)
-                img_PIL = Image.fromarray(result)                   '''
+                img_PIL = Image.fromarray(result)       '''
 
                 # Resize the image or the tensors to be (9, 50, 50)
                 # assumes image width and height are equals values and creates resizeTo tuple(50, 50)
@@ -256,10 +257,10 @@ class datasetPreparation(tf.keras.utils.Sequence):
                 # create a tensor from the numpy array of PIL images
                 nbpoints = 9
                 tensorBeliefs = self.CreateBeliefMap(img=img_PIL,
-                                                      pointsBelief=pointsBelief,
-                                                      nbpoints=nbpoints,
-                                                      sizeFactor=resizeTo,
-                                                      sigma=self.sigma)
+                                                     pointsBelief=pointsBelief,
+                                                     nbpoints=nbpoints,
+                                                     sizeFactor=resizeTo,
+                                                     sigma=self.sigma)
 
                 # Create affinity maps tensor and the PIL image of the vector
                 tensorAffinities, img_PIL_vector = self.CreateAffinityMap(img=img_PIL,
@@ -280,18 +281,15 @@ class datasetPreparation(tf.keras.utils.Sequence):
                 # image augmentation
                 # apply random contrast, random brightness and resize
                 # apply the normal probability density function, around the loc=1 for a value scale(gauss around loc for a scale limit)
-                # enhancer = ImageEnhance.Contrast(img_PIL)
-                # img_PIL = enhancer.enhance(np.random.normal(loc=1, scale=self.transform["contrast"]))
-                # enhancer = ImageEnhance.Brightness(img_PIL)
-                # img_PIL = enhancer.enhance(np.random.normal(loc=1, scale=self.transform["brightness"]))
+                enhancer = ImageEnhance.Contrast(img_PIL)
+                img_PIL = enhancer.enhance(np.random.normal(loc=1, scale=self.transform["contrast"]))
+                enhancer = ImageEnhance.Brightness(img_PIL)
+                img_PIL = enhancer.enhance(np.random.normal(loc=1, scale=self.transform["brightness"]))
                 # img_PIL = img_PIL.resize((self.transform["imgSize"], self.transform["imgSize"]))
 
                 # transform PIL image to tensor over the numpy array
                 # to numpy array
                 img_np = tf.keras.preprocessing.image.img_to_array(img_PIL)
-
-                # apply the normalization on the image array
-                # img_np *= (1.0/img_np.max())
 
                 # to tensorflow tensor
                 tensorImg = tf.keras.backend.constant(img_np)
@@ -300,9 +298,14 @@ class datasetPreparation(tf.keras.utils.Sequence):
                 tensorBeliefs = tf.transpose(tensorBeliefs, [1, 2, 0])
                 tensorAffinities = tf.transpose(tensorAffinities, [1, 2, 0])
 
-                tensorAffinities = tf.abs(tensorAffinities) 
+                # normalize beliefs to be 0-1
+                tensorBeliefs = tf.math.divide(tf.subtract(tensorBeliefs, tf.reduce_min(tensorBeliefs)),
+                                               tf.subtract(tf.reduce_max(tensorBeliefs), tf.reduce_min(tensorBeliefs))) * 255
+
+                # normalize affinities to be 0-1
+                tensorAffinities = tf.abs(tensorAffinities)
                 tensorAffinities = tf.math.divide(tf.subtract(tensorAffinities, tf.reduce_min(tensorAffinities)),
-                                                    tf.subtract(tf.reduce_max(tensorAffinities), tf.reduce_min(tensorAffinities))) *255
+                                                  tf.subtract(tf.reduce_max(tensorAffinities), tf.reduce_min(tensorAffinities))) * 255
 
                 # append to the list of tensors
                 imgs_list.append(tensorImg)
@@ -310,7 +313,10 @@ class datasetPreparation(tf.keras.utils.Sequence):
                 affinities_list.append(tensorAffinities)
 
             else:
-              tf.print('{} is missing json or png'.format(fileName.split('.')[0]))
+                tf.print('{} is missing json or png'.format(fileName.split('.')[0]))
+                imgs_list.append(tf.zeros((self.img_size, self.img_size, 3), dtype=tf.float32))
+                beliefs_list.append(tf.zeros((50, 50, 9), dtype=tf.float32))
+                affinities_list.append(tf.zeros((50, 50, 16), dtype=tf.float32))
 
         batch_imgs = tf.keras.backend.stack(imgs_list)
         batch_beliefs = tf.keras.backend.stack(beliefs_list)
@@ -474,8 +480,10 @@ class datasetPreparation(tf.keras.utils.Sequence):
         # make a grid of images(rows) vertical concat of the numpy array
         # change the type of the rows_cv and add a color to match the type and the shape of the 'img' to be able to concatonate
         gridBeliefImage_cv = cv2.cvtColor(cv2.vconcat(rows_cv.astype(np.uint8)), cv2.COLOR_BGR2RGB)
+        img_res = cv2.resize(np.array(img), dsize=(gridBeliefImage_cv.shape[0], gridBeliefImage_cv.shape[1]))
+        img_res = cv2.cvtColor(img_res, cv2.COLOR_BGR2RGB)
         # attach result image on the grid horizontaly
-        gridBelief_cv = cv2.hconcat([gridBeliefImage_cv, cv2.resize(np.array(img), dsize=(gridBeliefImage_cv.shape[0], gridBeliefImage_cv.shape[1]))])
+        gridBelief_cv = cv2.hconcat([gridBeliefImage_cv, img_res])
         # cv2.imshow('cv_grid_belief2', gridBelief_cv)
         # cv2.waitKey(0)
         cv2.imwrite('{}'.format(pathToSave), gridBelief_cv)
@@ -528,11 +536,13 @@ class datasetPreparation(tf.keras.utils.Sequence):
         gridImage_cv = cv2.cvtColor(gridImage_cv, cv2.COLOR_BGR2RGB)
         # cv2.imshow('gridImage_cv', gridImage_cv)
         # cv2.waitKey(0)
+        img_res = cv2.resize(np.array(img), dsize=(gridImage_cv.shape[0], gridImage_cv.shape[1]))
+        img_res = cv2.cvtColor(img_res, cv2.COLOR_BGR2RGB)
 
         # attach result image on the grid horizontaly
         grid_cv = cv2.hconcat([gridImage_cv,
                                cv2.resize(np.array(img_vector), dsize=(gridImage_cv.shape[0], gridImage_cv.shape[1])),
-                               cv2.resize(np.array(img), dsize=(gridImage_cv.shape[0], gridImage_cv.shape[1]))])
+                               img_res])
         # cv2.imshow('cv_grid_affinity', grid_cv)
         # cv2.waitKey(0)
         cv2.imwrite('{}'.format(pathToSave), grid_cv)

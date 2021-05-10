@@ -9,6 +9,7 @@ import configparser
 import datetime
 import warnings
 from PIL import Image
+import numpy as np
 
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -64,23 +65,23 @@ to use this script on the PC with multiple versions of the python, either use th
 def getLabelsLogitsImages(logits_bel, logits_aff, batch, img_number):
 
     # belief logits
-    beliefLogitsTensor = tf.reduce_sum(logits_bel[img_number], axis=2) * 255
-    beliefLogitsNumpy = beliefLogitsTensor.numpy()
+    beliefLogitsTensor = tf.reduce_sum(logits_bel[img_number], axis=2)  # * 255
+    beliefLogitsNumpy = beliefLogitsTensor.numpy().astype(np.uint8)
     belLog_img = Image.fromarray(beliefLogitsNumpy)
 
     # belief label
-    beliefLabelTensor = tf.reduce_sum(batch[1]['beliefs'][img_number], axis=2) * 255
-    beliefLabelNumpy = beliefLabelTensor.numpy()
+    beliefLabelTensor = tf.reduce_sum(batch[1]['beliefs'][img_number], axis=2)  # * 255
+    beliefLabelNumpy = beliefLabelTensor.numpy().astype(np.uint8)
     belLab_img = Image.fromarray(beliefLabelNumpy)
 
     # affinity logits
-    affinityLogitsTensor = tf.reduce_sum(logits_aff[img_number], axis=2)
-    affinityLogitsNumpy = affinityLogitsTensor.numpy()
+    affinityLogitsTensor = tf.reduce_sum(logits_aff[img_number], axis=2)  # * 255
+    affinityLogitsNumpy = affinityLogitsTensor.numpy().astype(np.uint8)
     affLog_img = Image.fromarray(affinityLogitsNumpy)
 
     # affinity label
-    affinityLabelTensor = tf.reduce_sum(batch[1]['affinities'][img_number], axis=2)
-    affinityLabelNumpy = affinityLabelTensor.numpy()
+    affinityLabelTensor = tf.reduce_sum(batch[1]['affinities'][img_number], axis=2)  # * 255
+    affinityLabelNumpy = affinityLabelTensor.numpy().astype(np.uint8)
     affLab_img = Image.fromarray(affinityLabelNumpy)
 
     return belLog_img, belLab_img, affLog_img, affLab_img
@@ -112,6 +113,61 @@ def saveLabelLogits(belLog_img, belLab_img, affLog_img, affLab_img, filename):
     plt.imshow(affLab_img)
     plt.title("affinity label")
     plt.savefig(filename+'.png')
+
+
+def forwardPass(model, dataset, optimizer, loss_fn_belief, loss_fn_affinity, belief_metric, affinity_metric, epoch, pathToSave, training):
+    """
+    run the forward pass on the dataset, returns the model, losses and metric
+    training input differs pass on train from the pass on test data
+    """
+    # Iterate over the batches of the dataset.
+    for step, batch in enumerate(dataset):
+
+        # Open a GradientTape to record the operations run during the forward pass, which enables auto-differentiation.
+        with tf.GradientTape(persistent=True) as tape:
+
+            # Run the forward pass of the layer to get logits for this minibatch
+            logits_beliefs, logits_affinities = model(batch[0]['images'], training=training)
+
+            # logits_beliefs_numpy = logits_beliefs.numpy()
+            # logits_affinities_numpy = logits_affinities.numpy()
+            # labels_beliefs_numpy = batch_train[1]['beliefs'].numpy()
+            # labels_affinities_numpy = batch_train[1]['affinities'].numpy()
+
+            # Compute the loss value for this minibatch.
+            loss_beliefs_value = loss_fn_belief(y_true=batch[1]['beliefs'], y_pred=logits_beliefs)
+            loss_affinities_value = loss_fn_affinity(y_true=batch[1]['affinities'], y_pred=logits_affinities)
+            loss = loss_beliefs_value + loss_affinities_value
+
+        # metrics
+        belief_metric.update_state(y_true=batch[1]['beliefs'], y_pred=logits_beliefs)
+        affinity_metric.update_state(y_true=batch[1]['affinities'], y_pred=logits_affinities)
+
+        if training:
+            # pbar is not used, because of the nohup
+            tf.print('train: {}/{}, mse beliefs: {}, mse_affinity: {}'.format(step+1, len(dataset), loss_beliefs_value, loss_affinities_value))
+            # Use the gradient tape to automatically retrieve the gradients of the trainable variables with respect to the loss.
+            grads = tape.gradient(loss, netModel.trainable_variables)
+            # apply gradients through backpropagation
+            optimizer.apply_gradients(zip(grads, netModel.trainable_variables))
+        else:
+            # pbar is not used, because of the nohup
+            tf.print('test: {}/{}, mse beliefs: {}, mse_affinity: {}'.format(step+1, len(dataset), loss_beliefs_value, loss_affinities_value))
+
+    del(tape)
+
+    # at the end save some labels and logits
+    # show labels and logits of the first image of the batch
+    belLog_img, belLab_img, affLog_img, affLab_img = getLabelsLogitsImages(logits_beliefs, logits_affinities, batch, 0)
+
+    if training:
+        # save images
+        saveLabelLogits(belLog_img, belLab_img, affLog_img, affLab_img, os.path.join(pathToSave, 'train_{}_epoch.png'.format(epoch)))
+    else:
+        # save images
+        saveLabelLogits(belLog_img, belLab_img, affLog_img, affLab_img, os.path.join(pathToSave, 'test_{}_epoch.png'.format(epoch)))
+
+    return model, belief_metric, affinity_metric
 
 
 ##################################################
@@ -398,56 +454,19 @@ if __name__ == '__main__':
                 with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
                     logfile.write("Start of epoch {}".format(epoch) + "\n")
 
-                # Iterate over the batches of the dataset.
-                for step, batch_train in enumerate(train_dataset):
-
-                    # Open a GradientTape to record the operations run
-                    # during the forward pass, which enables auto-differentiation.
-                    with tf.GradientTape(persistent=True) as tape:
-
-                        # Run the forward pass of the layer.
-                        logits_beliefs, logits_affinities = netModel(batch_train[0]['images'], training=True,)  # Logits for this minibatch
-
-                        # progress bar, used to show the progress of each epoch
-                        pbar = tf.keras.utils.Progbar(len(train_dataset), width=80, stateful_metrics=['mse_beliefs', 'mse_affinities'])
-
-                        # logits_beliefs_numpy = logits_beliefs.numpy()
-                        # logits_affinities_numpy = logits_affinities.numpy()
-                        # labels_beliefs_numpy = batch_train[1]['beliefs'].numpy()
-                        # labels_affinities_numpy = batch_train[1]['affinities'].numpy()
-
-                        # Compute the loss value for this minibatch.
-                        loss_beliefs_value = loss_fn_beliefs(y_true=batch_train[1]['beliefs'], y_pred=logits_beliefs)
-                        loss_affinities_value = loss_fn_affinities(y_true=batch_train[1]['affinities'], y_pred=logits_affinities)
-                        loss = loss_beliefs_value + loss_affinities_value
-
-                    # metrics
-                    beliefs_metric.update_state(y_true=batch_train[1]['beliefs'], y_pred=logits_beliefs)
-                    affinities_metric.update_state(y_true=batch_train[1]['affinities'], y_pred=logits_affinities)
-
-                    # update the progress bar in the epoch
-                    # jupyter progress bar creates a new line after each update
-                    pbar.update(step+1, values=[('mse_beliefs', beliefs_metric.result()), ('mse_affinities', affinities_metric.result())])
-                    tf.print('')
-
-                    # Use the gradient tape to automatically retrieve the gradients of the trainable variables with respect to the loss.
-                    # grads = tape.gradient(loss, netModel.trainable_variables, unconnected_gradients=tf.UnconnectedGradients.ZERO)
-                    grads = tape.gradient(loss, netModel.trainable_variables)
-                    del(tape)
-
-                    # apply gradients through backpropagation
-                    optimizer.apply_gradients(zip(grads, netModel.trainable_variables))
+                # run the forward pass for training
+                netModel, beliefs_metric, affinities_metric = forwardPass(netModel, 
+                                                                          train_dataset,
+                                                                          optimizer,
+                                                                          loss_fn_beliefs,
+                                                                          loss_fn_affinities,
+                                                                          beliefs_metric,
+                                                                          affinities_metric,
+                                                                          epoch,
+                                                                          labelsLogitsImgPath,
+                                                                          training=True)
 
                 # END OF THE EPOCH CODE
-                # save some labels and logits
-                debug = ((epoch+1) % 3 == 0)
-                if debug:
-                    # get label, logits images
-                    belLog_img, belLab_img, affLog_img, affLab_img = getLabelsLogitsImages(logits_beliefs, logits_affinities, batch_train, 0)
-
-                    # save images
-                    saveLabelLogits(belLog_img, belLab_img, affLog_img, affLab_img, os.path.join(labelsLogitsImgPath, 'train_{}_epoch.png'.format(epoch)))
-
                 # append to the epoch metrics
                 beliefLoss_perEpoch.append(beliefs_metric.result())
                 affinityLoss_perEpoch.append(affinities_metric.result())
@@ -458,15 +477,15 @@ if __name__ == '__main__':
                     tf.summary.scalar('loss_bel_metrics', beliefs_metric.result(), step=epoch)
 
                 # log important output to logfile
-                with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
-                    logfile.write("EPOCH {} ||Training loss ---> affinity loss: {}, beliefs loss: {}".format(epoch, float(affinities_metric.result().numpy()), float(beliefs_metric.result().numpy())) + "\n")
-                    logfile.write("Seen so far: %s samples" % ((step + 1) * opt.batchsize) + "\n")
-                    logfile.write("--------------------------------------------------------------------------------------------------------\n")
+                # with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
+                #     logfile.write("EPOCH {} ||Training loss ---> affinity loss: {}, beliefs loss: {}".format(epoch, float(affinities_metric.result().numpy()), float(beliefs_metric.result().numpy())) + "\n")
+                #     logfile.write("Seen so far: %s samples" % ((step + 1) * opt.batchsize) + "\n")
+                #     logfile.write("--------------------------------------------------------------------------------------------------------\n")
                 # fill list of beliefs and affinity losses
                 with open(os.path.join(debugFolderPath, 'Beliefs_loss.txt'), 'a') as bel_csv:
-                    bel_csv.write('{}; {};\n'.format(epoch, repr(round(float(beliefs_metric.result().numpy()), 4))))
+                    bel_csv.write('{}; {};\n'.format(epoch, repr(round(float(beliefs_metric.result().numpy()), 20))))
                 with open(os.path.join(debugFolderPath, 'Affinity_loss.txt'), 'a') as aff_csv:
-                    aff_csv.write('{}; {};\n'.format(epoch, repr(round(float(affinities_metric.result().numpy()), 4))))
+                    aff_csv.write('{}; {};\n'.format(epoch, repr(round(float(affinities_metric.result().numpy()), 20))))
 
                 # reset metrics per batch
                 beliefs_metric.reset_states()
@@ -482,41 +501,17 @@ if __name__ == '__main__':
                     beliefs_metric_test = tf.keras.metrics.MeanSquaredError(name='beliefs_accuracy', dtype=tf.float32)
                     affinities_metric_test = tf.keras.metrics.MeanSquaredError(name='affinities_accuracy', dtype=tf.float32)
 
-                    # progress bar, used to show the progress of each epoch
-                    pbar_test = tf.keras.utils.Progbar(len(test_dataset), width=80, stateful_metrics=['mse_beliefs', 'mse_affinities'])
-
-                    # Iterate over the batches of the dataset.
-                    for step_test, batch_test in enumerate(test_dataset):
-                        # Run the forward pass of the layer.
-                        logits_beliefs_test, logits_affinities_test = netModel(batch_test[0]['images'], training=False,)  # Logits for this minibatch
-
-                        # Compute the loss value for this minibatch.
-                        loss_beliefs_value_test = loss_fn_beliefs(y_true=batch_test[1]['beliefs'], y_pred=logits_beliefs_test)
-                        loss_affinities_value_test = loss_fn_affinities(y_true=batch_test[1]['affinities'], y_pred=logits_affinities_test)
-                        loss_test = loss_beliefs_value_test + loss_affinities_value_test
-
-                        # append loss values in list for later
-                        beliefLoss_perBatch_test.append(loss_beliefs_value_test)
-                        affinityLoss_perBatch_test.append(loss_affinities_value_test)
-
-                        # metrics
-                        beliefs_metric_test.update_state(y_true=batch_test[1]['beliefs'], y_pred=logits_beliefs_test)
-                        affinities_metric_test.update_state(y_true=batch_test[1]['affinities'], y_pred=logits_affinities_test)
-
-                        # update the progress bar in the epoch
-                        # jupyter progress bar creates a new line after each update
-                        pbar_test.update(step+1, values=[('mse_beliefs', beliefs_metric_test.result()), ('mse_affinities', affinities_metric_test.result())])
-                        tf.print('')
-
-                        # ################################################################################################################
-                        # ################################################ print outputs #################################################
-                        # show labels and logits of the first image of the batch
-                        belLog_img_test, belLab_img_test, affLog_img_test, affLab_img_test = getLabelsLogitsImages(logits_beliefs_test, logits_affinities_test, batch_test, 0)
-                        # save images
-                        saveLabelLogits(belLog_img_test, belLab_img_test, affLog_img_test, affLab_img_test, os.path.join(labelsLogitsImgPath, 'test_{}_epoch.png'.format(epoch)))
-
-                    beliefs_metric_test.reset_states()
-                    affinities_metric_test.reset_states()
+                    # run the forward pass for training
+                    _, beliefs_metric_test, affinities_metric_test = forwardPass(netModel,
+                                                                                 test_dataset,
+                                                                                 optimizer,
+                                                                                 loss_fn_beliefs,
+                                                                                 loss_fn_affinities,
+                                                                                 beliefs_metric_test,
+                                                                                 affinities_metric_test,
+                                                                                 epoch,
+                                                                                 labelsLogitsImgPath,
+                                                                                 training=False)
 
                     # Beliefs loss
                     tf.print("SAVING BELIEFS AND AFFINITIES LOSS PLOTS...")
@@ -534,6 +529,10 @@ if __name__ == '__main__':
                     plt.ylabel("loss")
                     plt.plot(affinityLoss_perBatch_test)
                     plt.savefig(os.path.join(debugFolderPath, 'test_epoch_{}_affinities&beliefs_loss.png'.format(epoch)), bbox_inches='tight')
+
+                    # reset test metrics
+                    beliefs_metric_test.reset_states()
+                    affinities_metric_test.reset_states()
 
                 # save a model after each epoch
                 if opt.savemodelafterepoch:
@@ -557,7 +556,7 @@ if __name__ == '__main__':
                     with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
                         logfile.write('Epoch duration: {}'.format(epoch_duration) + "\n")
 
-            tf.print("Training finished after {} epochs.".format(epoch_count))
+            tf.print("Training finished after {} epochs.".format(epoch_count+1))
             # log important outputs to log file
             with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
                 logfile.write("Training finished after {} epochs.".format(epoch_count) + "\n")
