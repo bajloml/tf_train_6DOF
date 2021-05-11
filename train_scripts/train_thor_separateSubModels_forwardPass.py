@@ -26,7 +26,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'classes', 'custom
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'classes', 'datasetPreparation'))
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 
-from customModel import customModel
+# from customModel import customModel
+from featureModel import featureModel
 from datasetPreparation import datasetPreparation
 
 tf.get_logger().setLevel('WARNING')
@@ -120,6 +121,11 @@ def forwardPass(model, dataset, optimizer, loss_fn_belief, loss_fn_affinity, bel
     run the forward pass on the dataset, returns the model, losses and metric
     training input differs pass on train from the pass on test data
     """
+
+    # save the epoch loss, used later to print the loss in a matplotlib
+    beliefLoss_list = []
+    affinityLoss_list = []
+
     # Iterate over the batches of the dataset.
     for step, batch in enumerate(dataset):
 
@@ -154,6 +160,9 @@ def forwardPass(model, dataset, optimizer, loss_fn_belief, loss_fn_affinity, bel
             # pbar is not used, because of the nohup
             tf.print('test: {}/{}, mse beliefs: {}, mse_affinity: {}'.format(step+1, len(dataset), loss_beliefs_value, loss_affinities_value))
 
+        beliefLoss_list.append(loss_beliefs_value)
+        affinityLoss_list.append(loss_affinities_value)
+
     del(tape)
 
     # at the end save some labels and logits
@@ -167,7 +176,7 @@ def forwardPass(model, dataset, optimizer, loss_fn_belief, loss_fn_affinity, bel
         # save images
         saveLabelLogits(belLog_img, belLab_img, affLog_img, affLab_img, os.path.join(pathToSave, 'test_{}_epoch.png'.format(epoch)))
 
-    return model, belief_metric, affinity_metric
+    return model, belief_metric, affinity_metric, beliefLoss_list, affinityLoss_list
 
 
 ##################################################
@@ -356,7 +365,8 @@ if __name__ == '__main__':
 
             tf.keras.backend.clear_session()
 
-            netModel = customModel(pretrained=opt.pretrained, blocks=6, freezeLayers=14,)
+            # netModel = customModel(pretrained=opt.pretrained, blocks=6, freezeLayers=14,)
+            netModel = featureModel(pretrained=opt.pretrained, blocks=6, freezeLayers=14,)
             # netModel = markoDopeModel_funcAPI(numBeliefMap=9, numAffinity=16, stop_at_stage=1, inp_shape=(400, 400, 3), pretrained=opt.pretrained)
 
             # model can be built by calling the build function but then all of the layers have to be used.
@@ -455,16 +465,16 @@ if __name__ == '__main__':
                     logfile.write("Start of epoch {}".format(epoch) + "\n")
 
                 # run the forward pass for training
-                netModel, beliefs_metric, affinities_metric = forwardPass(netModel, 
-                                                                          train_dataset,
-                                                                          optimizer,
-                                                                          loss_fn_beliefs,
-                                                                          loss_fn_affinities,
-                                                                          beliefs_metric,
-                                                                          affinities_metric,
-                                                                          epoch,
-                                                                          labelsLogitsImgPath,
-                                                                          training=True)
+                netModel, beliefs_metric, affinities_metric, _, _ = forwardPass(netModel,
+                                                                                train_dataset,
+                                                                                optimizer,
+                                                                                loss_fn_beliefs,
+                                                                                loss_fn_affinities,
+                                                                                beliefs_metric,
+                                                                                affinities_metric,
+                                                                                epoch,
+                                                                                labelsLogitsImgPath,
+                                                                                training=True)
 
                 # END OF THE EPOCH CODE
                 # append to the epoch metrics
@@ -494,24 +504,24 @@ if __name__ == '__main__':
                 # run the test dataset if exists
                 if test_dataset is not None and opt.usetestdataset:
 
-                    # save the epoch loss, used later to print the loss in a matplotlib
-                    beliefLoss_perBatch_test = []
-                    affinityLoss_perBatch_test = []
-
                     beliefs_metric_test = tf.keras.metrics.MeanSquaredError(name='beliefs_accuracy', dtype=tf.float32)
                     affinities_metric_test = tf.keras.metrics.MeanSquaredError(name='affinities_accuracy', dtype=tf.float32)
 
                     # run the forward pass for training
-                    _, beliefs_metric_test, affinities_metric_test = forwardPass(netModel,
-                                                                                 test_dataset,
-                                                                                 optimizer,
-                                                                                 loss_fn_beliefs,
-                                                                                 loss_fn_affinities,
-                                                                                 beliefs_metric_test,
-                                                                                 affinities_metric_test,
-                                                                                 epoch,
-                                                                                 labelsLogitsImgPath,
-                                                                                 training=False)
+                    _, beliefs_metric_test, affinities_metric_test, beliefLoss_perBatch_test, affinityLoss_perBatch_test = forwardPass(netModel,
+                                                                                                                                       test_dataset,
+                                                                                                                                       optimizer,
+                                                                                                                                       loss_fn_beliefs,
+                                                                                                                                       loss_fn_affinities,
+                                                                                                                                       beliefs_metric_test,
+                                                                                                                                       affinities_metric_test,
+                                                                                                                                       epoch,
+                                                                                                                                       labelsLogitsImgPath,
+                                                                                                                                       training=False)
+
+                    # append to the epoch metrics
+                    beliefLoss_perBatch_test.append(beliefs_metric_test.result())
+                    affinityLoss_perBatch_test.append(affinities_metric_test.result())
 
                     # Beliefs loss
                     tf.print("SAVING BELIEFS AND AFFINITIES LOSS PLOTS...")
