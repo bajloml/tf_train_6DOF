@@ -85,10 +85,6 @@ class featureModel(tf.keras.Model):
             self.affinity_1 = self.create_block(self.numFeatures, numAffinity, name='affinity1')
             self.affinity_2 = self.create_block(self.numFeatures + 1*numAffinity, numAffinity, name='affinity2')
 
-            self.layer22 = tf.keras.layers.BatchNormalization(name="BatchNorm22")
-
-            self.layer32 = tf.keras.layers.BatchNormalization(name="BatchNorm32")
-
         if self.blocks == 3:
             self.belief_1 = self.create_block(self.numFeatures, numBeliefMap, name='belief1')
             self.belief_2 = self.create_block(self.numFeatures + 1*numBeliefMap, numBeliefMap, name='belief2')
@@ -97,12 +93,6 @@ class featureModel(tf.keras.Model):
             self.affinity_1 = self.create_block(self.numFeatures, numAffinity, name='affinity1')
             self.affinity_2 = self.create_block(self.numFeatures + 1*numAffinity, numAffinity, name='affinity2')
             self.affinity_3 = self.create_block(self.numFeatures + 2*numAffinity + 1*self.numFeatures, numAffinity, name='affinity3')
-
-            self.layer22 = tf.keras.layers.BatchNormalization(name="BatchNorm22")
-            self.layer23 = tf.keras.layers.BatchNormalization(name="BatchNorm23")
-
-            self.layer32 = tf.keras.layers.BatchNormalization(name="BatchNorm32")
-            self.layer33 = tf.keras.layers.BatchNormalization(name="BatchNorm33")
 
         if self.blocks == 4:
             self.belief_1 = self.create_block(self.numFeatures, numBeliefMap, name='belief1')
@@ -114,16 +104,6 @@ class featureModel(tf.keras.Model):
             self.affinity_2 = self.create_block(self.numFeatures + 1*numAffinity, numAffinity, name='affinity2')
             self.affinity_3 = self.create_block(self.numFeatures + 2*numAffinity + 1*self.numFeatures, numAffinity, name='affinity3')
             self.affinity_4 = self.create_block(self.numFeatures + 3*numAffinity + 2*self.numFeatures, numAffinity, name='affinity4')
-
-            self.layer22 = tf.keras.layers.BatchNormalization(name="BatchNorm22")
-            self.layer23 = tf.keras.layers.BatchNormalization(name="BatchNorm23")
-            self.layer24 = tf.keras.layers.BatchNormalization(name="BatchNorm24")
-            self.layer25 = tf.keras.layers.BatchNormalization(name="BatchNorm25")
-            self.layer26 = tf.keras.layers.BatchNormalization(name="BatchNorm26")
-
-            self.layer32 = tf.keras.layers.BatchNormalization(name="BatchNorm32")
-            self.layer33 = tf.keras.layers.BatchNormalization(name="BatchNorm33")
-            self.layer34 = tf.keras.layers.BatchNormalization(name="BatchNorm34")
 
         if self.blocks == 5:
             self.belief_1 = self.create_block(self.numFeatures, numBeliefMap, name='belief1')
@@ -137,16 +117,6 @@ class featureModel(tf.keras.Model):
             self.affinity_3 = self.create_block(self.numFeatures + 2*numAffinity + 1*self.numFeatures, numAffinity, name='affinity3')
             self.affinity_4 = self.create_block(self.numFeatures + 3*numAffinity + 2*self.numFeatures, numAffinity, name='affinity4')
             self.affinity_5 = self.create_block(self.numFeatures + 4*numAffinity + 3*self.numFeatures, numAffinity, name='affinity5')
-
-            self.layer22 = tf.keras.layers.BatchNormalization(name="BatchNorm22")
-            self.layer23 = tf.keras.layers.BatchNormalization(name="BatchNorm23")
-            self.layer24 = tf.keras.layers.BatchNormalization(name="BatchNorm24")
-            self.layer25 = tf.keras.layers.BatchNormalization(name="BatchNorm25")
-
-            self.layer32 = tf.keras.layers.BatchNormalization(name="BatchNorm32")
-            self.layer33 = tf.keras.layers.BatchNormalization(name="BatchNorm33")
-            self.layer34 = tf.keras.layers.BatchNormalization(name="BatchNorm34")
-            self.layer35 = tf.keras.layers.BatchNormalization(name="BatchNorm35")
 
         if self.blocks == 6:
             self.belief_1 = self.create_block(self.numFeatures, numBeliefMap, name='belief1')
@@ -163,23 +133,11 @@ class featureModel(tf.keras.Model):
             self.affinity_5 = self.create_block(self.numFeatures + 4*numAffinity + 3*self.numFeatures, numAffinity, name='affinity5')
             self.affinity_6 = self.create_block(self.numFeatures + 5*numAffinity + 4*self.numFeatures, numAffinity, name='affinity6')
 
-            self.layer22 = tf.keras.layers.BatchNormalization(name="BatchNorm22")
-            self.layer23 = tf.keras.layers.BatchNormalization(name="BatchNorm23")
-            self.layer24 = tf.keras.layers.BatchNormalization(name="BatchNorm24")
-            self.layer25 = tf.keras.layers.BatchNormalization(name="BatchNorm25")
-            self.layer26 = tf.keras.layers.BatchNormalization(name="BatchNorm26")
-
-            self.layer32 = tf.keras.layers.BatchNormalization(name="BatchNorm32")
-            self.layer33 = tf.keras.layers.BatchNormalization(name="BatchNorm33")
-            self.layer34 = tf.keras.layers.BatchNormalization(name="BatchNorm34")
-            self.layer35 = tf.keras.layers.BatchNormalization(name="BatchNorm35")
-            self.layer36 = tf.keras.layers.BatchNormalization(name="BatchNorm36")
-
         # freeze layers
         for layer in range(self.freezeLayers):
             self.layers[layer].trainable = False
 
-    def call(self, inputs):
+    def call(self, inputs, training=False):
         ''' Runs inference on the neural network
             inputs is a dictionary consisted of keys ['img':tensor, 'belief':tensor, 'affinity':tensor]
             Pushes the inputs(batch) input through the certain layers(conv2D and MaxPooling) after the last layer it will
@@ -224,9 +182,6 @@ class featureModel(tf.keras.Model):
         # concatonate on axis=3 means it will make another tensor of the shape (None, 50, 50, (128+9+16))
         x1 = tf.concat(values=[bel1, features], axis=3)
         x2 = tf.concat(values=[aff1, features], axis=3)
-        # batch norms
-        x1 = self.layer22(x1)
-        x2 = self.layer32(x2)
 
         bel2 = self.belief_2(x1)
         aff2 = self.affinity_2(x2)
@@ -237,9 +192,6 @@ class featureModel(tf.keras.Model):
         # concatonate on axis=3 means it will make another tensor of the shape (None, 50, 50, (128+9+16))
         x1 = tf.concat(values=[bel2, x1, features], axis=3)
         x2 = tf.concat(values=[aff2, x2, features], axis=3)
-        # batch norms
-        x1 = self.layer23(x1)
-        x2 = self.layer33(x2)
 
         bel3 = self.belief_3(x1)
         aff3 = self.affinity_3(x2)
@@ -250,9 +202,6 @@ class featureModel(tf.keras.Model):
         # concatonate on axis=3 means it will make another tensor of the shape (None, 50, 50, (128+9+16))
         x1 = tf.concat(values=[bel3, x1, features], axis=3)
         x2 = tf.concat(values=[aff3, x2, features], axis=3)
-        # batch norms
-        x1 = self.layer24(x1)
-        x2 = self.layer34(x2)
 
         bel4 = self.belief_4(x1)    # shape(None, 50, 50, 9)    Belief
         aff4 = self.affinity_4(x2)    # shape(None, 50, 50, 16)   Affinities
@@ -263,9 +212,6 @@ class featureModel(tf.keras.Model):
         # concatonate on axis=3 means it will make another tensor of the shape (None, 50, 50, (128+9+16))
         x1 = tf.concat(values=[bel4, x1, features], axis=3)
         x2 = tf.concat(values=[aff4, x2, features], axis=3)
-        # batch norms
-        x1 = self.layer25(x1)
-        x2 = self.layer35(x2)
 
         bel5 = self.belief_5(x1)    # shape(None, 50, 50, 9)    Belief
         aff5 = self.affinity_5(x2)    # shape(None, 50, 50, 16)   Affinities
@@ -276,9 +222,6 @@ class featureModel(tf.keras.Model):
         # concatonate on axis=3 means it will make another tensor of the shape (None, 50, 50, (128+9+16))
         x1 = tf.concat(values=[bel5, x1, features], axis=3)
         x2 = tf.concat(values=[aff5, x2, features], axis=3)
-        # batch norms
-        x1 = self.layer26(x1)
-        x2 = self.layer36(x2)
 
         bel6 = self.belief_6(x1)    # shape(None, 50, 50, 9)    Belief
         aff6 = self.affinity_6(x2)    # shape(None, 50, 50, 16)   Affinities
