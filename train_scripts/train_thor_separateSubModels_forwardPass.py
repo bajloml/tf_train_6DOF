@@ -387,7 +387,7 @@ if __name__ == '__main__':
             # info about current epoch
             epoch_count = 0
 
-            # netModel.summary()
+            netModel.summary()
 
             # plot model, if it is created it can be ploted, if it was loaded it can't?
             tf.print('ploting_model...')
@@ -422,7 +422,7 @@ if __name__ == '__main__':
             train_summary_writer = tf.summary.create_file_writer(train_log_dir)
             test_summary_writer = tf.summary.create_file_writer(test_log_dir)
 
-            # create csv files for the loss values
+            # create csv files for train loss values
             if (os.path.exists(os.path.join(debugFolderPath, 'Beliefs_loss.txt')) and os.path.exists(os.path.join(debugFolderPath, 'Affinity_loss.txt'))):
                 with open(os.path.join(debugFolderPath, 'Beliefs_loss.txt'), 'a') as bel_csv:
                     bel_csv.write('Epoch; Beliefs loss;\n')
@@ -433,6 +433,19 @@ if __name__ == '__main__':
                     bel_csv.write('Epoch; Beliefs loss;\n')
                 with open(os.path.join(debugFolderPath, 'Affinity_loss.txt'), 'w') as aff_csv:
                     aff_csv.write('Epoch; Affinity loss;\n')
+
+            # create csv files for test loss values
+            if (os.path.exists(os.path.join(debugFolderPath, 'Beliefs_loss_test.txt')) and os.path.exists(os.path.join(debugFolderPath, 'Affinity_loss_test.txt'))):
+                with open(os.path.join(debugFolderPath, 'Beliefs_loss_test.txt'), 'a') as bel_csv:
+                    bel_csv.write('Epoch; Beliefs test loss;\n')
+                with open(os.path.join(debugFolderPath, 'Affinity_loss_test.txt'), 'a') as aff_csv:
+                    aff_csv.write('Epoch; Affinity loss;\n')
+            else:
+                with open(os.path.join(debugFolderPath, 'Beliefs_loss_test.txt'), 'w') as bel_csv:
+                    bel_csv.write('Epoch; Beliefs test loss;\n')
+                with open(os.path.join(debugFolderPath, 'Affinity_loss_test.txt'), 'w') as aff_csv:
+                    aff_csv.write('Epoch; Affinity loss;\n')
+
             # log important outputs to log file
             if (os.path.exists(os.path.join(debugFolderPath, 'Beliefs_loss.txt'))):
                 with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
@@ -444,6 +457,7 @@ if __name__ == '__main__':
                     logfile.write("start training: " + str(datetime.datetime.now().date()) + " " + str(datetime.datetime.now().time()) + "\n")
                     logfile.write("--------------------------------------------------------------------------------------------------------\n")
                     logfile.write("--------------------------------------------------------------------------------------------------------\n")
+
 
             # check dataset
             batch_check = train_dataset[0]
@@ -460,8 +474,8 @@ if __name__ == '__main__':
                 epoch_count = epoch
                 epoch_start_time = datetime.datetime.now().time().strftime('%H:%M:%S')
                 # log important outputs to log file
-                with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
-                    logfile.write("Start of epoch {}".format(epoch) + "\n")
+                # with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
+                #     logfile.write("Start of epoch {}".format(epoch) + "\n")
 
                 # run the forward pass for training
                 netModel, beliefs_metric, affinities_metric, _, _ = forwardPass(netModel,
@@ -487,8 +501,8 @@ if __name__ == '__main__':
 
                 # log important output to logfile
                 with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
-                    logfile.write("EPOCH {} ||Training loss ---> affinity loss: {}, beliefs loss: {}".format(epoch, float(affinities_metric.result().numpy()), float(beliefs_metric.result().numpy())) + "\n")
-                    logfile.write("--------------------------------------------------------------------------------------------------------\n")
+                    logfile.write("EPOCH {}:\n\tTraining loss ---> affinity loss: {}, beliefs loss: {}".format(epoch, float(affinities_metric.result().numpy()), float(beliefs_metric.result().numpy())) + "\n")
+
                 # fill list of beliefs and affinity losses
                 with open(os.path.join(debugFolderPath, 'Beliefs_loss.txt'), 'a') as bel_csv:
                     bel_csv.write('{}; {};\n'.format(epoch, repr(round(float(beliefs_metric.result().numpy()), 20))))
@@ -521,6 +535,17 @@ if __name__ == '__main__':
                     beliefLoss_perBatch_test.append(beliefs_metric_test.result())
                     affinityLoss_perBatch_test.append(affinities_metric_test.result())
 
+                    # log important output to logfile
+                    with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
+                        logfile.write("\tTesting loss ---> affinity loss: {}, beliefs loss: {}".format(float(affinities_metric_test.result().numpy()),
+                                                                                                       float(affinities_metric_test.result().numpy())) + "\n")
+
+                    # fill list of beliefs and affinity losses
+                    with open(os.path.join(debugFolderPath, 'Beliefs_loss_test.txt'), 'a') as bel_csv:
+                        bel_csv.write('{}; {};\n'.format(epoch, repr(round(float(beliefs_metric_test.result().numpy()), 20))))
+                    with open(os.path.join(debugFolderPath, 'Affinity_loss_test.txt'), 'a') as aff_csv:
+                        aff_csv.write('{}; {};\n'.format(epoch, repr(round(float(affinities_metric_test.result().numpy()), 20))))
+
                     # Beliefs loss
                     tf.print("SAVING BELIEFS AND AFFINITIES LOSS PLOTS...")
                     plt.figure(figsize=(20, 10))
@@ -542,6 +567,15 @@ if __name__ == '__main__':
                     beliefs_metric_test.reset_states()
                     affinities_metric_test.reset_states()
 
+                    # calculate epoch time
+                    epoch_end_time = datetime.datetime.now().time().strftime('%H:%M:%S')
+                    epoch_duration = (datetime.datetime.strptime(epoch_end_time, '%H:%M:%S') - datetime.datetime.strptime(epoch_start_time, '%H:%M:%S'))
+                    tf.print('Epoch duration(h:mm:ss): {}'.format(epoch_duration))
+                    # log important outputs to log file
+                    with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
+                        logfile.write('\tEpoch duration: {}'.format(epoch_duration) + "\n")
+                        logfile.write("--------------------------------------------------------------------------------------------------------\n")
+
                 # save a model after each epoch
                 if opt.savemodelafterepoch:
 
@@ -555,14 +589,6 @@ if __name__ == '__main__':
                     # save a checkpoints after each epoch to be able to load weights
                     tf.print('Saving the checkpoints: {}'.format(ckptPathToSave))
                     netModel.save_weights(os.path.join(ckptPathToSave, 'cp.ckpt'))
-
-                    # calculate epoch time
-                    epoch_end_time = datetime.datetime.now().time().strftime('%H:%M:%S')
-                    epoch_duration = (datetime.datetime.strptime(epoch_end_time, '%H:%M:%S') - datetime.datetime.strptime(epoch_start_time, '%H:%M:%S'))
-                    tf.print('Epoch duration(h:mm:ss): {}'.format(epoch_duration))
-                    # log important outputs to log file
-                    with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
-                        logfile.write('Epoch duration: {}'.format(epoch_duration) + "\n")
 
             tf.print("Training finished after {} epochs.".format(epoch_count+1))
             # log important outputs to log file
