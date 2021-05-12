@@ -366,8 +366,7 @@ if __name__ == '__main__':
             tf.keras.backend.clear_session()
 
             # netModel = customModel(pretrained=opt.pretrained, blocks=6, freezeLayers=14,)
-            netModel = featureModel(pretrained=opt.pretrained, blocks=6, freezeLayers=14,)
-            # netModel = markoDopeModel_funcAPI(numBeliefMap=9, numAffinity=16, stop_at_stage=1, inp_shape=(400, 400, 3), pretrained=opt.pretrained)
+            netModel = featureModel(pretrained=opt.pretrained, numFeatures=512, blocks=4, freezeLayers=14,)
 
             # model can be built by calling the build function but then all of the layers have to be used.
             # or by calling the fit function
@@ -388,7 +387,7 @@ if __name__ == '__main__':
             # info about current epoch
             epoch_count = 0
 
-            netModel.summary()
+            # netModel.summary()
 
             # plot model, if it is created it can be ploted, if it was loaded it can't?
             tf.print('ploting_model...')
@@ -487,10 +486,9 @@ if __name__ == '__main__':
                     tf.summary.scalar('loss_bel_metrics', beliefs_metric.result(), step=epoch)
 
                 # log important output to logfile
-                # with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
-                #     logfile.write("EPOCH {} ||Training loss ---> affinity loss: {}, beliefs loss: {}".format(epoch, float(affinities_metric.result().numpy()), float(beliefs_metric.result().numpy())) + "\n")
-                #     logfile.write("Seen so far: %s samples" % ((step + 1) * opt.batchsize) + "\n")
-                #     logfile.write("--------------------------------------------------------------------------------------------------------\n")
+                with open(os.path.join(debugFolderPath, 'logfile.txt'), 'a') as logfile:
+                    logfile.write("EPOCH {} ||Training loss ---> affinity loss: {}, beliefs loss: {}".format(epoch, float(affinities_metric.result().numpy()), float(beliefs_metric.result().numpy())) + "\n")
+                    logfile.write("--------------------------------------------------------------------------------------------------------\n")
                 # fill list of beliefs and affinity losses
                 with open(os.path.join(debugFolderPath, 'Beliefs_loss.txt'), 'a') as bel_csv:
                     bel_csv.write('{}; {};\n'.format(epoch, repr(round(float(beliefs_metric.result().numpy()), 20))))
@@ -551,8 +549,8 @@ if __name__ == '__main__':
                     ckptPathToSave = os.path.join(ckptFolder, '{}_blocks_{}'.format(opt.namefile, netModel.blocks))
 
                     # save a model after each epoch in the 'tf' format
-                    tf.print('Saving the model: {}'.format(modelPathToSave))
-                    netModel.save(modelPathToSave, save_format='tf')
+                    # tf.print('Saving the model: {}'.format(modelPathToSave))
+                    # netModel.save(modelPathToSave, save_format='tf')
 
                     # save a checkpoints after each epoch to be able to load weights
                     tf.print('Saving the checkpoints: {}'.format(ckptPathToSave))
