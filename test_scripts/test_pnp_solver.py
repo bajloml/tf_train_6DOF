@@ -421,14 +421,6 @@ if __name__ == '__main__':
                 tensorImg = draw_axis(tensorImg, rot_v, tran_v, matrix_camera)
 
                 # get model points projections on the image
-                #rot_v[0,0]=0
-                #rot_v[1,0]=0
-                #rot_v[2,0]=0
-
-                #tran_v[0,0]=0
-                #tran_v[1,0]=0
-                #tran_v[2,0]=400
-
                 model_points_dict_2D = getProjectedModel2DPts(model_points_dict_3D, rot_v, tran_v, matrix_camera, dist_coeffs)
 
                 # draw point projections on the image
