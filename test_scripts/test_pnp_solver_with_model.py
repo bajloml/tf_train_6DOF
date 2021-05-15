@@ -6,19 +6,26 @@ import os
 import tensorflow as tf
 import argparse
 import configparser
+import cv2
 
 import numpy as np
 import datetime
 from PIL import Image
 import matplotlib.pyplot as plt
+import math
 
 import warnings
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'classes', 'customModel'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'classes', 'datasetPreparation'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'classes', 'positionSolver'))
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 
-from customModel import customModel
+from dopeModel import dopeModel
+from featureModel import featureModel
+from residualModel import residualModel
+from positionSolver import positionSolver
+
 from datasetPreparation import datasetPreparation
 
 #warnings.filterwarnings("ignore")
@@ -71,6 +78,72 @@ def getLabelsLogitsImages(logits_bel, logits_aff, batch_tr, img_number):
 
     return img1, img2, img3, img4
 
+def getFilterImages(logits, img_number):
+
+    filters = tf.shape(logits)[-1] #len(logits[0,50,50])
+    images = []
+    for filter in range(filters):
+        LogitsTensor = logits[img_number,:,:,filter]# * 255
+        LogitsNumpy = LogitsTensor.numpy()
+        images.append(Image.fromarray(LogitsNumpy))  
+
+    return images
+
+def saveFilterImages(images, filename, polarize=False):
+
+    columns = math.sqrt(len(images))
+    rows = columns
+
+    fig = plt.figure(figsize=(rows, columns))
+    borderColor = [255, 255, 255]
+
+    list_pol_img = []
+    list_img = []
+
+    for row in range(int(rows)):
+        for col in range(int(columns)):
+            img_index = row*int(rows)+col+1
+            fig.add_subplot(rows, columns, img_index)
+            plt.axis('off')
+
+            #get numpy array from Image PIL
+            img_np = np.array(images[img_index-1])
+            list_img.append(img_np)
+            #initialy polarized image is same as image
+            img_np_pol = img_np
+
+            #polarize everything with treshold of img_np.max value
+            tresh_val = int(np.amax(img_np))
+            #define lambda function
+            polarizator = lambda x: 0 if (x<1*tresh_val) else 255
+
+            if polarize and tresh_val>1:
+                #define functor
+                vfunc = np.vectorize(polarizator)
+                #apply functor to get a polarized image
+                img_np_pol = vfunc(img_np)
+            #append polarized images to list
+            list_pol_img.append(img_np_pol)
+            
+            #add border to image
+            borderedImage = cv2.copyMakeBorder(img_np_pol, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=borderColor)
+            plt.imshow(borderedImage)
+
+            #Image.fromarray(img_np_pol).show()
+            #Image.fromarray(img_np).show()
+
+    image_pol_array = np.expand_dims(list_pol_img, axis=3)
+    pol = np.concatenate(image_pol_array, axis=2)
+    pol = np.sum(pol, axis=2)
+
+    image_array = np.expand_dims(list_img, axis=3)
+    img = np.concatenate(image_array, axis=2)
+    img = np.sum(img, axis=2)
+    
+    Image.fromarray(img).show()
+    Image.fromarray(pol).show()
+
+    plt.savefig(filename+'.png')
 
 if __name__ == '__main__':
 
@@ -97,11 +170,11 @@ if __name__ == '__main__':
     parser.add_argument('--batchsize', type=int, default=32, help='input batch size')
     parser.add_argument('--imagesize', type=int, default=400, help='the height width of the input image to network')
     parser.add_argument('--noise', type=float, default=2.0, help='gaussian noise added to the image')
-    parser.add_argument('--net', default='', help="path to net (to continue training)")
+    parser.add_argument('--model', default="", help='model which will be used for predicition')
+    parser.add_argument('--ckptPath', default='', help="path to model checkpoints")
     parser.add_argument('--outf', default='tmp', help='folder to output images and model checkpoints, it will add a train_ in front of the name')
     parser.add_argument('--namefile', default='epoch', help="name to put on the file of the save weights")
     parser.add_argument('--sigma', default=4, help='keypoint creation size for sigma')
-    parser.add_argument('--savedmodelpath', help='path to the saved model')
 
     # Read the config but do not overwrite the args written 
     # read the configuration from the file given by with a "-c" or "--config" file if it exists
@@ -134,7 +207,7 @@ if __name__ == '__main__':
                  'imgSize': int(opt.imagesize)}
     #########################################Create debug folder to store the debug data##################################################
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    debugFolderPath = os.path.join(dir_path, 'test_DEBUG', str(opt.outf))
+    debugFolderPath = os.path.join(dir_path, 'DEBUG_pnp_solver_{}'.format(opt.model), str(opt.outf))
 
     # if debug folder doesn't exists, create it
     if not os.path.isdir(debugFolderPath):
@@ -148,9 +221,6 @@ if __name__ == '__main__':
                                           batch_size=opt.batchsize, keep_orientation=True, noise=opt.noise,
                                           sigma=opt.sigma, debugFolderPath=debugFolderPath,
                                           transform=transform, shuffle=True, saveAffAndBelImages=False)
-    # save the epoch loss, used later to print the loss in a matplotlib
-    beliefLoss_perBatch = []
-    affinityLoss_perBatch = []
     
     with tf.device('/GPU:0'):
 
@@ -160,26 +230,22 @@ if __name__ == '__main__':
 
             tf.keras.backend.clear_session()
 
-            # netModel = customModel(pretrained=True, blocks=6, freezeLayers=14,)
-            tf.print('Loading the model from path:\n{}'.format(opt.savedmodelpath))
-            netModel = tf.keras.models.load_model(opt.savedmodelpath)
+            if(opt.model=='featureModel'):
+                tf.print('Creating feature model')
+                netModel = featureModel(pretrained=True, blocks=6, numFeatures=512, freezeLayers=14,)
+            elif(opt.model=='residualModel'):
+                tf.print('Creating residual model')
+                netModel = residualModel(pretrained=True, blocks=6, freezeLayers=14,)
 
             # model can be built by calling the build function but then all of the layers have to be used.
             # or by calling the fit function
             # to load weights model has to be built
-            # tf.print('building model: {}'.format(netModel.name))
-            # netModel.build(input_shape=(None, 400, 400, 3))
+            tf.print('building model: {}'.format(netModel.name))
+            netModel.build(input_shape=(None, 400, 400, 3))
 
-            #tf.print('loading weights from: {}'.format(opt.ckptpath))
-            #netModel.load_weights(filepath=opt.ckptpath)
+            tf.print('loading weights from: {}'.format(opt.ckptpath))
+            netModel.load_weights(filepath=opt.ckptpath)
             # netModel = tf.keras.models.load_model(filepath=opt.net)
-
-            # Instantiate losses and metrics.
-            loss_fn_beliefs = tf.keras.losses.MeanSquaredError(name='beliefs_loss')
-            loss_fn_affinities = tf.keras.losses.MeanSquaredError(name='affinities_loss')
-
-            beliefs_metric = tf.keras.metrics.MeanSquaredError(name='beliefs_accuracy', dtype=tf.float32) 
-            affinities_metric = tf.keras.metrics.MeanSquaredError(name='affinities_accuracy', dtype=tf.float32)
 
             # check dataset
             batch_check = test_dataset[0]
@@ -194,81 +260,53 @@ if __name__ == '__main__':
             # progress bar, used to show the progress of each epoch
             pbar = tf.keras.utils.Progbar(len(test_dataset), width=80, stateful_metrics=['mse_beliefs', 'mse_affinities',])
 
+            #position solver
+            if opt.debug == 'True':
+                debug = True
+            else:
+                debug = False
+
+            ps_true = positionSolver(opt.camsettings, opt.objsettings, debug, text_width_ratio=0.01, text_height_ratio=0.05, 
+                                    text = 'Label',  belColor = (255, 0, 0), affColor = (255, 0, 0)) 
+            ps_prediction = positionSolver(opt.camsettings, opt.objsettings, debug, text_width_ratio=0.01, text_height_ratio=0.1, 
+                                    text = 'Logit',  belColor = (0, 255, 0), affColor = (0, 255, 0)) 
+
             # Iterate over the batches of the dataset.
             for step, batch_test in enumerate(test_dataset):
                 # Run the forward pass of the layer.
                 logits_beliefs, logits_affinities = netModel(batch_test[0]['images'], training=False,)  # Logits for this minibatch
+                test_img = batch_test[0]['images']
+                # true values
+                rot_true, tran_true, test_img, _ = ps_true.getPosition(batch_test[1]['beliefs'], batch_test[1]['affinities'], test_img)
 
-                # Compute the loss value for this minibatch.
-                loss_beliefs_value = loss_fn_beliefs(y_true=batch_test[1]['beliefs'], y_pred=logits_beliefs)
-                loss_affinities_value = loss_fn_affinities(y_true=batch_test[1]['affinities'], y_pred=logits_affinities)
-                loss = loss_beliefs_value + loss_affinities_value
-
-                #append loss values in list for later
-                beliefLoss_perBatch.append(loss_beliefs_value)
-                affinityLoss_perBatch.append(loss_affinities_value)
-
-                # metrics
-                beliefs_metric.update_state(y_true=batch_test[1]['beliefs'], y_pred=logits_beliefs)
-                affinities_metric.update_state(y_true=batch_test[1]['affinities'], y_pred=logits_affinities)
-
-                # update the progress bar in the epoch
-                # jupyter progress bar creates a new line after each update
-                pbar.update(step+1, values=[('mse_beliefs', beliefs_metric.result()), ('mse_affinities', affinities_metric.result()),])
-                # tf.print('')
+                test_img = tf.convert_to_tensor(test_img, dtype=tf.float32)
+                #model prediciton
+                rot_pred, tran_pred, test_img, _ = ps_prediction.getPosition(logits_beliefs, logits_affinities, test_img)
                 
-                #################################################################################################################
-                ################################################# print outputs #################################################
-                # show labels and logits of the first image of the dataset
-                imgBelLog, imgBelLab, imgAffLog, imgAffLab = getLabelsLogitsImages(logits_beliefs, logits_affinities, batch_test, 0)
-<<<<<<< HEAD
-                # show labels and logits of the first image of the dataset
-                saveLabelLogits(imgBelLog, imgBelLab, imgAffLog, imgAffLab, os.path.join(debugFolderPath, 'test_{}'.format(step)))
-
-=======
-                saveLabelLogits(imgBelLog, imgBelLab, imgAffLog, imgAffLab, os.path.join(debugFolderPath, 'test_{}'.format(step)))
-                """
->>>>>>> cb30ae344292312d90eb8cc7e6ad21dbf96b75ab
-                list_im = [imgBelLog, imgBelLab, imgAffLog, imgAffLab]
-                width = imgBelLog.width
-                height = imgBelLog.height
-                new_im_width = len(list_im)*(width)
-                # creates a new empty image, RGB mode, and size 444 by 95
-                new_img = Image.new('RGB', (new_im_width, height+10))
-                
-                for place, elem in enumerate(list_im):
-                    im=elem
-                    new_img.paste(im, (place*width,0))
-
-<<<<<<< HEAD
-                #new_img.save('test_{}.jpg'.format(step))
-=======
-                new_img.save(os.path.join(debugFolderPath, 'test_{}.jpg'.format(step)))
->>>>>>> cb30ae344292312d90eb8cc7e6ad21dbf96b75ab
-                #new_img.show()
-                """
-            #Beliefs loss
-            tf.print("SAVING BELIEFS AND AFFINITIES LOSS PLOTS...")
-            plt.figure(figsize=(20,10))
-            plt.subplot(1, 2, 1)
-            plt.title('Beliefs loss')
-            plt.xlabel("img nr.")
-            plt.ylabel("loss")
-            plt.plot(beliefLoss_perBatch)
-            
-            #Affinities loss
-            plt.subplot(1, 2, 2)
-            plt.title('Affinities loss')
-            plt.xlabel("img nr.")
-            plt.ylabel("loss")
-            plt.plot(affinityLoss_perBatch)
-            plt.savefig(os.path.join(debugFolderPath, 'test_affinities&beliefs_loss.png'), bbox_inches='tight')
+                #true rotation and translation
+                tf.print("Label ROTATION and TRANSLATION: ")
+                tf.print("ROTATION:")
+                {tf.print('\t {}'.format(value)) for value in rot_true}
+                tf.print("TRANSLATION:")
+                {tf.print('\t {}'.format(value)) for value in tran_true}
+                #predicted rotation and translation
+                tf.print("Logit ROTATION and TRANSLATION: ")
+                tf.print("ROTATION:")
+                {tf.print('\t {}'.format(value)) for value in rot_pred}
+                tf.print("TRANSLATION:")
+                {tf.print('\t {}'.format(value)) for value in tran_pred}
+                #save image
+                test_img = Image.fromarray(test_img)
+                test_img.save(os.path.join( debugFolderPath, 'test_{}.png'.format(step)))
 
         except ImportError as ie:
             tf.print('import error:\n {}'.format(ie))
 
         except ValueError as ve:
             tf.print('value error:\n {}'.format(ve))
+        
+        except cv2.error as e:
+            tf.print('opencv error:\n {}'.format(e))
 
         except:
             e = sys.exc_info()[0]
