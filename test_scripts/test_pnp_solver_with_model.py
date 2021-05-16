@@ -21,7 +21,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'classes', 'datase
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'classes', 'positionSolver'))
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 
-from dopeModel import dopeModel
 from featureModel import featureModel
 from residualModel import residualModel
 from positionSolver import positionSolver
