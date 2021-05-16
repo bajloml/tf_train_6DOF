@@ -21,7 +21,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'classes', 'datase
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'classes', 'positionSolver'))
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 
-from dopeModel import dopeModel
 from featureModel import featureModel
 from residualModel import residualModel
 from positionSolver import positionSolver
@@ -278,7 +277,7 @@ if __name__ == '__main__':
                 test_img = batch_test[0]['images']
                 # true values
                 rot_true, tran_true, test_img, _ = ps_true.getPosition(batch_test[1]['beliefs'], batch_test[1]['affinities'], test_img)
-
+                #convert numpy array to tensor
                 test_img = tf.convert_to_tensor(test_img, dtype=tf.float32)
                 #model prediciton
                 rot_pred, tran_pred, test_img, _ = ps_prediction.getPosition(logits_beliefs, logits_affinities, test_img)

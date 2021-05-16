@@ -164,6 +164,8 @@ def addCoordOnImage(image, image_points, scale, color):
     draws a point of color in the position given in image points on the given image 
     """
 
+    image = np.copy(image)
+
     # copy the image first, otherwise it will draw on the input image
     ImgFrom_image_points = np.copy(image)
 
@@ -175,14 +177,6 @@ def addCoordOnImage(image, image_points, scale, color):
                     tuple(point*scale),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.4, color, 1)
-
-    # add imgName
-    
-    #cv2.putText(ImgFrom_image_points, '{}'.format(text),
-    #            #(int(ImgFrom_image_points.shape[1]-ImgFrom_image_points.shape[0]/2), int(0+ImgFrom_image_points.shape[1]/15)),  # upper rigth corner
-    #            (int(ImgFrom_image_points.shape[0]*text_width_ratio), int(ImgFrom_image_points.shape[1]*text_height_ratio)),  # upper rigth corner
-    #            cv2.FONT_HERSHEY_SIMPLEX,
-    #            0.5, color, 2)
 
     return ImgFrom_image_points
 
@@ -216,12 +210,15 @@ def draw_axis(image, rot, tran, mat_cam):
     points = np.float32([[100, 0, 0], [0, 100, 0], [0, 0, 100], [0, 0, 0]]).reshape(-1, 3)
     axisPoints, jac = cv2.projectPoints(points, rot, tran, mat_cam, (0, 0, 0, 0))
 
+    #color conversion
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
     # x color red
-    image = cv2.line(image, tuple(axisPoints[3].ravel()), tuple(axisPoints[0].ravel()), (0, 0, 255), 2)
+    image = cv2.line(image, tuple(axisPoints[3].ravel()), tuple(axisPoints[0].ravel()), (255, 0, 0), 2)
     # y color green
-    image = cv2.line(image, tuple(axisPoints[3].ravel()), tuple(axisPoints[1].ravel()), (255, 0, 0), 2)
+    image = cv2.line(image, tuple(axisPoints[3].ravel()), tuple(axisPoints[1].ravel()), (0, 255, 0), 2)
     # z color blue
-    image = cv2.line(image, tuple(axisPoints[3].ravel()), tuple(axisPoints[2].ravel()), (0, 255, 0), 2)
+    image = cv2.line(image, tuple(axisPoints[3].ravel()), tuple(axisPoints[2].ravel()), (0, 0, 255), 2)
 
     return image
 
@@ -314,9 +311,9 @@ class positionSolver():
         print('model cuboid points:')
         {print('\t{}:{}'.format(key, value)) for key, value in self.model_points.items()}
 
-    def getPosition(self, belTensor, affTensor, image):
+    def getPosition(self, belTensor, affTensor, tensor_image):
         #img = np.copy(image)
-        img = image
+        tensor_img = tensor_image
 
         bel_image_points, bel_image_points_dict, _, = getImagePointCoords(belTensor)
 
@@ -324,21 +321,21 @@ class positionSolver():
         #print('belief image points dict:')
         #{print('\t{}:{}'.format(key, value)) for key, value in bel_image_points_dict.items()}
         bel_shape = tf.shape(belTensor)[1:3]
-        bel_scale = int(tf.shape(img)[1]/tf.shape(belTensor)[1])
+        bel_scale = int(tf.shape(tensor_img)[1]/tf.shape(belTensor)[1])
 
         ############################################################################################################
         # AFFINITY get the point coordinates from each filter(point), these will be our image_points
         aff_image_points, aff_image_points_dict, _, = getImagePointCoords(affTensor)
         aff_shape = tf.shape(affTensor)[1:3]
-        aff_scale = int(tf.shape(img)[1]/tf.shape(affTensor)[1])
+        aff_scale = int(tf.shape(tensor_img)[1]/tf.shape(affTensor)[1])
 
         # check if there is a point at pixel coordinate is (0, 0) and remove that point
         # (0, 0) not all points are in the image and when we create an image from labels it will have coordinates (0,0)
         # for example if in belief maps the filter is completely black
         bel_image_points_dict, model_points_dict_3D = removeZeroCoord(image_points_dict=bel_image_points_dict, model_points_dict=self.model_points)
         
-        belPointsOnImage = addCoordOnImage(image=img, image_points=bel_image_points, scale=bel_scale, color=self.belColor)
-        affPointsOnImage = addCoordOnImage(image=img, image_points=aff_image_points, scale=aff_scale, color=self.affColor)
+        belPointsOnImage = addCoordOnImage(image=tensor_img, image_points=bel_image_points, scale=bel_scale, color=self.belColor)
+        affPointsOnImage = addCoordOnImage(image=tensor_img, image_points=aff_image_points, scale=aff_scale, color=self.affColor)
 
         #belPointsOnImage = addCoordOnImage(image=img, image_points=bel_image_points, imgName='beliefs', scale=bel_scale, color=self.belColor)
         #affPointsOnImage = addCoordOnImage(image=img, image_points=aff_image_points, imgName='affinity', scale=aff_scale, color=self.affColor)
@@ -368,7 +365,7 @@ class positionSolver():
 
             # get the image from the dataset
             #tensorImg = getImage(test_dataset)
-            tensorImg = getBatchImage(img)
+            tensorImg = getBatchImage(tensor_img)
             # draw axis
             if self.debug:
                 tensorImg = draw_axis(tensorImg, rot_v, tran_v, self.matrix_camera)
