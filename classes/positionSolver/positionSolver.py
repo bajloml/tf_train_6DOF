@@ -207,9 +207,12 @@ def draw_axis(image, rot, tran, mat_cam):
     # unit is mm
     # rot, _ = cv2.Rodrigues(rot)
     # points [x,y,z]
+
     points = np.float32([[100, 0, 0], [0, 100, 0], [0, 0, 100], [0, 0, 0]]).reshape(-1, 3)
     axisPoints, jac = cv2.projectPoints(points, rot, tran, mat_cam, (0, 0, 0, 0))
 
+    # copy the image first, otherwise it will draw on the input image
+    image = np.copy(image)
     #color conversion
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
