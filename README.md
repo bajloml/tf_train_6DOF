@@ -1,3 +1,12 @@
+# Results:
+![alt text][sample1]
+![alt text][sample2]
+![alt text][sample3]
+
+[sample1]: https://github.com/bajloml/tf_train_6DOF/blob/master/test_scripts/images/test_0.png "sample1"
+[sample2]: https://github.com/bajloml/tf_train_6DOF/blob/master/test_scripts/images/test_9.png "sample2"
+[sample3]: https://github.com/bajloml/tf_train_6DOF/blob/master/test_scripts/images/test_16.png "sample3"
+
 # Project is based on the 'Deep Object Pose Estimation for Semantic Robotic Grasping of Household Objects'
 
 @inproceedings{tremblay2018corl:dope,
