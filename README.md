@@ -32,5 +32,7 @@ Quotation of the Synthesizer which was used to create dataset
     title = {{NDDS}: {NVIDIA} Deep Learning Dataset Synthesizer},
     Year = 2018
     }
+    
+# This project is made out of curiosity and solely for non-profit purposes
 	
 # Models are created in Tensorflow 2.4.1 and trained on GCP platform using Ubuntu 18.04 equiped with NVIDIA V100 GPU.
