@@ -169,6 +169,9 @@ def addCoordOnImage(image, image_points, scale, color):
     # copy the image first, otherwise it will draw on the input image
     ImgFrom_image_points = np.copy(image)
 
+    #convert to uint8
+    image_points = image_points.astype(np.uint8)
+
     for index, point in enumerate(image_points):
         cv2.circle(img=ImgFrom_image_points, center=tuple(point*scale), radius=2, color=color, thickness=-1)
         cv2.putText(ImgFrom_image_points,
@@ -210,6 +213,9 @@ def draw_axis(image, rot, tran, mat_cam):
 
     points = np.float32([[100, 0, 0], [0, 100, 0], [0, 0, 100], [0, 0, 0]]).reshape(-1, 3)
     axisPoints, jac = cv2.projectPoints(points, rot, tran, mat_cam, (0, 0, 0, 0))
+
+    #convert to uint8
+    axisPoints = axisPoints.astype(np.uint8)
 
     # copy the image first, otherwise it will draw on the input image
     image = np.copy(image)
