@@ -7,7 +7,7 @@ import json
 import numpy as np
 import tensorflow as tf
 
-#help functions
+# help functions
 def create3DCuboidPts(x, y, z):
     """
     creates a cuboid points from the x, y and z dimensions
@@ -273,9 +273,21 @@ def draw_cuboid(image, model_points_2D, color):
 
 class positionSolver():
 
-    def __init__(self, camSettingsJSON, objSettingsJSON, debug, text_width_ratio, text_height_ratio, text='',  belColor = (0, 0, 255), affColor = (0, 255, 255)):
+    def __init__(self,
+                 camSettingsJSON,
+                 cameraSettings_cv_path,
+                 use_opencv_intrinsics,
+                 objSettingsJSON,
+                 debug,
+                 text_width_ratio,
+                 text_height_ratio,
+                 text='',
+                 belColor=(0, 0, 255),
+                 affColor=(0, 255, 255)):
         
         self.camSettingsJSON = camSettingsJSON
+        self.cameraSettings_cv_path = cameraSettings_cv_path
+        self.use_opencv_intrinsics = use_opencv_intrinsics
         self.objSettingsJSON = objSettingsJSON
         self.belColor = belColor
         self.affColor = affColor
@@ -285,18 +297,26 @@ class positionSolver():
         self.debug = debug
         self.dist_coeffs = np.zeros((4, 1))  # Assuming no lens distortion
 
-        #read camera json file
-        camera_matrix_path = self.camSettingsJSON
-        with open(camera_matrix_path) as data_file:
-            json_camera_matrix = json.load(data_file)
+        # camera settings from ndds
+        if not self.use_opencv_intrinsics:
+            # read camera json file
+            camera_matrix_path = self.camSettingsJSON
+            with open(camera_matrix_path) as data_file:
+                json_camera_matrix = json.load(data_file)
 
-        # Initialize parameters
-        self.matrix_camera = np.zeros((3, 3))
-        self.matrix_camera[0, 0] = json_camera_matrix['camera_settings'][0]['intrinsic_settings']['fx']
-        self.matrix_camera[1, 1] = json_camera_matrix['camera_settings'][0]['intrinsic_settings']['fy']
-        self.matrix_camera[0, 2] = json_camera_matrix['camera_settings'][0]['intrinsic_settings']['cx']
-        self.matrix_camera[1, 2] = json_camera_matrix['camera_settings'][0]['intrinsic_settings']['cy']
-        self.matrix_camera[2, 2] = 1
+            # Initialize camera parameters
+            self.matrix_camera = np.zeros((3, 3))
+            self.matrix_camera[0, 0] = json_camera_matrix['camera_settings'][0]['intrinsic_settings']['fx']
+            self.matrix_camera[1, 1] = json_camera_matrix['camera_settings'][0]['intrinsic_settings']['fy']
+            self.matrix_camera[0, 2] = json_camera_matrix['camera_settings'][0]['intrinsic_settings']['cx']
+            self.matrix_camera[1, 2] = json_camera_matrix['camera_settings'][0]['intrinsic_settings']['cy']
+            self.matrix_camera[2, 2] = 1
+        
+        # camera settings from opencv
+        if self.use_opencv_intrinsics:
+            self.CamSettings = cv2.FileStorage(self.cameraSettings_cv_path, cv2.FILE_STORAGE_READ)
+            self.matrix_camera = self.CamSettings.getNode("intrinsic_settings").mat()
+            self.dist_coeffs = self.CamSettings.getNode("dist").mat()
 
         #Fixed model transform
         object_sett_path = self.objSettingsJSON
@@ -344,11 +364,11 @@ class positionSolver():
         #affPointsOnImage = addCoordOnImage(image=img, image_points=aff_image_points, imgName='affinity', scale=aff_scale, color=self.affColor)
 
         (success, rot_v, tran_v) = cv2.solvePnP(objectPoints=np.array(list(model_points_dict_3D.values()), dtype=np.float32),
-                                        # imagePoints=(np.array(list(aff_image_points_dict.values()), dtype=np.float32) * aff_scale),
-                                        imagePoints=(np.array(list(bel_image_points_dict.values()), dtype=np.float32) * bel_scale),
-                                        cameraMatrix=self.matrix_camera,
-                                        distCoeffs=self.dist_coeffs,
-                                        flags=cv2.SOLVEPNP_ITERATIVE)
+                                                # imagePoints=(np.array(list(aff_image_points_dict.values()), dtype=np.float32) * aff_scale),
+                                                imagePoints=(np.array(list(bel_image_points_dict.values()), dtype=np.float32) * bel_scale),
+                                                cameraMatrix=self.matrix_camera,
+                                                distCoeffs=self.dist_coeffs,
+                                                flags=cv2.SOLVEPNP_ITERATIVE)
         if success:
             #print('Rotation Vector:\n {}\n'.format(rot_v))
             #print('Translation Vector:\n {}\n'.format(tran_v))

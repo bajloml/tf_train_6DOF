@@ -174,18 +174,22 @@ if __name__ == '__main__':
     parser.add_argument('--outf', default='tmp', help='folder to output images and model checkpoints, it will add a train_ in front of the name')
     parser.add_argument('--namefile', default='epoch', help="name to put on the file of the save weights")
     parser.add_argument('--sigma', default=4, help='keypoint creation size for sigma')
+    parser.add_argument('--videopath', help='path to video file to test on')
+    parser.add_argument('--size', type=int, default=400, help='path to video file to test on')
+    parser.add_argument('--camera_settings_cv_path', help='path to the camera instrinsics made by opencv')
+    parser.add_argument('--use_opencv_intrinsics', help='use opencv camera intrinsics, if False, it will use nnds settings if provided')
 
-    # Read the config but do not overwrite the args written 
+    # Read the config but do not overwrite the args written
     # read the configuration from the file given by with a "-c" or "--config" file if it exists
-    conf_parser = argparse.ArgumentParser( description=__doc__, # printed with -h/--help
-                                           # Don't mess with format of description
-                                           formatter_class=argparse.RawDescriptionHelpFormatter,
-                                           # Turn off help, so we print all options in response to -h
-                                           add_help=True)
+    conf_parser = argparse.ArgumentParser(description=__doc__, # printed with -h/--help
+                                          # Don't mess with format of description
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          # Turn off help, so we print all options in response to -h
+                                          add_help=True)
 
     conf_parser.add_argument("-c", "--config", help="Specify config file", metavar="FILE")
     args, remaining_argv = conf_parser.parse_known_args()
-    defaults = {"option":"default"}
+    defaults = {"option": "default"}
 
     if args.config:
         config = configparser.SafeConfigParser()
@@ -198,15 +202,9 @@ if __name__ == '__main__':
     parser.add_argument("--option")
     opt = parser.parse_args(remaining_argv)
 
-    # transform dictionary to apply on the image in the train dataset preparation
-    contrast = 0.2
-    brightness = 0.2
-    transform = {'contrast': contrast,
-                 'brightness': brightness,
-                 'imgSize': int(opt.imagesize)}
     #########################################Create debug folder to store the debug data##################################################
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    debugFolderPath = os.path.join(dir_path, 'DEBUG_pnp_solver_{}'.format(opt.model), str(opt.outf))
+    debugFolderPath = os.path.join(dir_path, 'DEBUG_pnp_solver_on_video_{}'.format(opt.model), str(opt.outf))
 
     # if debug folder doesn't exists, create it
     if not os.path.isdir(debugFolderPath):
@@ -214,25 +212,18 @@ if __name__ == '__main__':
             os.makedirs(debugFolderPath)
         except OSError:
             pass
-
-    if opt.datatest != "":
-        test_dataset = datasetPreparation(root=opt.datatest, objectsofinterest=opt.obj, datasetName='test_Dataset',
-                                          batch_size=opt.batchsize, keep_orientation=True, noise=opt.noise,
-                                          sigma=opt.sigma, debugFolderPath=debugFolderPath,
-                                          transform=transform, shuffle=True, saveAffAndBelImages=False)
     
     with tf.device('/GPU:0'):
-
         try:
-            tf.print ("START: {}".format(datetime.datetime.now().time()))
+            tf.print("START: {}".format(datetime.datetime.now().time()))
             tf.print('using tensorflow version: ' + str(tf.__version__))
 
             tf.keras.backend.clear_session()
 
-            if(opt.model=='featureModel'):
+            if(opt.model == 'featureModel'):
                 tf.print('Creating feature model')
                 netModel = featureModel(pretrained=True, blocks=6, numFeatures=512, freezeLayers=14,)
-            elif(opt.model=='residualModel'):
+            elif(opt.model == 'residualModel'):
                 tf.print('Creating residual model')
                 netModel = residualModel(pretrained=True, blocks=6, freezeLayers=14,)
 
@@ -244,66 +235,90 @@ if __name__ == '__main__':
 
             tf.print('loading weights from: {}'.format(opt.ckptpath))
             netModel.load_weights(filepath=opt.ckptpath)
-            # netModel = tf.keras.models.load_model(filepath=opt.net)
 
-            # check dataset
-            batch_check = test_dataset[0]
-            tf.print('batch_check[0][images] shape-> {}'.format(tf.shape(batch_check[0]['images'])))
-            tf.print('batch_check[1][beliefs] shape-> {}'.format(tf.shape(batch_check[1]['beliefs'])))
-            tf.print('batch_check[1][affinities] shape-> {}'.format(tf.shape(batch_check[1]['affinities'])))
-            tf.print('')
-            tf.print('batch_check[0][images] max-> {}, min-> {}'.format(tf.reduce_max(batch_check[0]['images']), tf.reduce_min(batch_check[0]['images'])))
-            tf.print('batch_check[1][beliefs] max-> {}, min-> {}'.format(tf.reduce_max(batch_check[1]['beliefs']), tf.reduce_min(batch_check[1]['beliefs'])))
-            tf.print('batch_check[1][affinities] max-> {}, min-> {}'.format(tf.reduce_max(batch_check[1]['affinities']), tf.reduce_min(batch_check[1]['affinities'])))
-
-            # progress bar, used to show the progress of each epoch
-            pbar = tf.keras.utils.Progbar(len(test_dataset), width=80, stateful_metrics=['mse_beliefs', 'mse_affinities',])
-
-            #position solver
+            # position solver
             if opt.debug == 'True':
                 debug = True
             else:
                 debug = False
 
-            ps_true = positionSolver(opt.camsettings, None, False, opt.objsettings, debug, text_width_ratio=0.01, text_height_ratio=0.05,
-                                     text='Label',  belColor=(255, 0, 0), affColor=(255, 0, 0))
-            ps_prediction = positionSolver(opt.camsettings, None, False, opt.objsettings, debug, text_width_ratio=0.01, text_height_ratio=0.1,
-                                           text='Logit', belColor=(0, 255, 0), affColor=(0, 255, 0))
+            # intrinsics
+            if opt.use_opencv_intrinsics == 'True':
+                use_opencv_intrinsics = True
+            else:
+                use_opencv_intrinsics = False
+ 
+            ps_prediction = positionSolver(opt.camsettings,
+                                           opt.camera_settings_cv_path,
+                                           use_opencv_intrinsics,
+                                           opt.objsettings,
+                                           debug,
+                                           text_width_ratio=0.01,
+                                           text_height_ratio=0.1,
+                                           text='Logit',
+                                           belColor=(0, 255, 0),
+                                           affColor=(0, 255, 0))
 
-            # Iterate over the batches of the dataset.
-            for step, batch_test in enumerate(test_dataset):
+            # Create a VideoCapture object and read from input file
+            videoCap = cv2.VideoCapture(opt.videopath)
+            
+            # define the writer to make video of collected frames
+            videoWriter = cv2.VideoWriter(os.path.join(debugFolderPath, 'videoAfterModel.avi'), cv2.VideoWriter_fourcc(*'DIVX'), 15, (400, 400))
+
+            # Check if capturer is working properly
+            if not videoCap.isOpened():
+                print("Can not open the video file")
+                exit(0)
+
+            # read frames of the video
+            while (videoCap.isOpened()):
+
+                # Capture frame
+                ret, frame = videoCap.read()
+                if ret:
+                    frame = cv2.resize(frame, (opt.size, opt.size))
+                    imgTensor = tf.convert_to_tensor(frame)
+                    imgTensor = tf.expand_dims(imgTensor, axis=0)
+                    imgTensor = tf.cast(imgTensor, dtype=tf.float32)
+                else:
+                    break
+
+                start_time = datetime.datetime.now().time().strftime('%H:%M:%S')
                 # Run the forward pass of the layer.
-                logits_beliefs, logits_affinities = netModel(batch_test[0]['images'], training=False,)  # Logits for this minibatch
-                test_img = batch_test[0]['images']
-                # true values
-                rot_true, tran_true, test_img, _ = ps_true.getPosition(batch_test[1]['beliefs'], batch_test[1]['affinities'], test_img)
-                #convert numpy array to tensor
-                test_img = tf.convert_to_tensor(test_img, dtype=tf.float32)
-                #model prediciton
-                rot_pred, tran_pred, test_img, _ = ps_prediction.getPosition(logits_beliefs, logits_affinities, test_img)
-                
-                #true rotation and translation
-                tf.print("Label ROTATION and TRANSLATION: ")
-                tf.print("ROTATION:")
-                {tf.print('\t {}'.format(value)) for value in rot_true}
-                tf.print("TRANSLATION:")
-                {tf.print('\t {}'.format(value)) for value in tran_true}
-                #predicted rotation and translation
+                logits_beliefs, logits_affinities = netModel(imgTensor, training=False)  # Logits for this minibatch
+                end_time = datetime.datetime.now().time().strftime('%H:%M:%S')
+                # calculate time for a forward pass
+                duration = (datetime.datetime.strptime(end_time, '%H:%M:%S') - datetime.datetime.strptime(start_time, '%H:%M:%S'))
+                print('Forward pass duration(h:mm:ss): {}\n'.format(duration))
+
+                # model prediction
+                rot_pred, tran_pred, test_img, _ = ps_prediction.getPosition(logits_beliefs, logits_affinities, imgTensor)
+
+                # predicted rotation and translation
                 tf.print("Logit ROTATION and TRANSLATION: ")
                 tf.print("ROTATION:")
                 {tf.print('\t {}'.format(value)) for value in rot_pred}
                 tf.print("TRANSLATION:")
                 {tf.print('\t {}'.format(value)) for value in tran_pred}
-                #save image
+
+                # write img to video
+                videoWriter.write(test_img)
+
+                test_img = cv2.cvtColor(test_img, cv2.COLOR_BGR2RGB)
                 test_img = Image.fromarray(test_img)
-                test_img.save(os.path.join( debugFolderPath, 'test_{}.png'.format(step)))
+                test_img.save(os.path.join(debugFolderPath, 'test.png'))
+
+            if (not videoCap.isOpened()):
+                # release
+                videoCap.release()
+                videoWriter.release()
 
         except ImportError as ie:
             tf.print('import error:\n {}'.format(ie))
 
         except ValueError as ve:
             tf.print('value error:\n {}'.format(ve))
-        
+
         except cv2.error as e:
             tf.print('opencv error:\n {}'.format(e))
 
