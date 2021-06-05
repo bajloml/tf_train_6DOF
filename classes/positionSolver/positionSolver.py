@@ -206,13 +206,13 @@ def removeZeroCoord(image_points_dict, model_points_dict):
 
     return image_points_dict, model_points_dict
 
-def draw_axis(image, rot, tran, mat_cam):
+def draw_axis(image, rot, tran, mat_cam, dist_coeffs):
     # unit is mm
-    # rot, _ = cv2.Rodrigues(rot)
+    rot, _ = cv2.Rodrigues(rot)
     # points [x,y,z]
 
     points = np.float32([[100, 0, 0], [0, 100, 0], [0, 0, 100], [0, 0, 0]]).reshape(-1, 3)
-    axisPoints, jac = cv2.projectPoints(points, rot, tran, mat_cam, (0, 0, 0, 0))
+    axisPoints, jac = cv2.projectPoints(points, rot, tran, mat_cam, dist_coeffs)
 
     #convert to uint8
     axisPoints = axisPoints.astype(np.uint8)
@@ -397,7 +397,7 @@ class positionSolver():
             tensorImg = getBatchImage(tensor_img)
             # draw axis
             if self.debug:
-                tensorImg = draw_axis(tensorImg, rot_v, tran_v, self.matrix_camera)
+                tensorImg = draw_axis(tensorImg, rot_v, tran_v, self.matrix_camera, self.dist_coeffs)
 
                 # get model points projections on the image
                 model_points_dict_2D = getProjectedModel2DPts(model_points_dict_3D, rot_v, tran_v, self.matrix_camera, self.dist_coeffs)
